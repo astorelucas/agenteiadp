@@ -1,0 +1,22 @@
+#AI Agent Tutorial
+
+#1. Setting up the environment:
+
+python -m venv venv     #: criation of virtual environment
+.\venv\Scripts\activate #: activation of the venv
+source .venv/bin/activate # Mac
+
+pip install -r .\requirements.txt
+
+#2. Creating folders
+- main.py : # where most of our code will be written
+- tools.py : # to organize our tools
+- .env : # to place some credentials
+
+#3. Adding your key into .env file
+
+#4. Call the llm model
+
+#Tools are things that the LLM/agent can use that we can
+# either write ourself or we can bring in from things like
+# the Langchain Community hub

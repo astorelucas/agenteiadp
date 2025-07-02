@@ -1,0 +1,13 @@
+langchain
+wikipedia
+langchain-community
+langchain-openai
+langchain-anthropic
+langchain-huggingface
+python-dotenv
+pydantic
+duckduckgo-search
+pypdf
+tiktoken
+langgraph
+grandalf

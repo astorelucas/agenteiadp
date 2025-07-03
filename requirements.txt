@@ -11,3 +11,6 @@ pypdf
 tiktoken
 langgraph
 grandalf
+pandas
+numpy
+scikit-learn

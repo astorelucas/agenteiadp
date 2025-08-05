@@ -16,3 +16,4 @@ pandas
 numpy
 scikit-learn
 tabulate
+missingpy

@@ -5,6 +5,7 @@ langchain-openai
 langchain-anthropic
 langchain-huggingface
 langchain-experimental
+langchain-tavily
 python-dotenv
 pydantic
 duckduckgo-search

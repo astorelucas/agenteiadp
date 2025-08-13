@@ -4,6 +4,8 @@ langchain-community
 langchain-openai
 langchain-anthropic
 langchain-huggingface
+langchain-experimental
+langchain-tavily
 python-dotenv
 pydantic
 duckduckgo-search
@@ -14,3 +16,7 @@ grandalf
 pandas
 numpy
 scikit-learn
+tabulate
+missingpy
+tensorly
+pyppeteer

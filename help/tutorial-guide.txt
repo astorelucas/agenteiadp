@@ -6,7 +6,7 @@ python -m venv venv     #: criation of virtual environment
 .\venv\Scripts\activate #: activation of the venv
 source .venv/bin/activate # Mac
 
-pip install -r .\requirements.txt
+pip install -r requirements.txt
 
 #2. Creating folders
 - main.py : # where most of our code will be written

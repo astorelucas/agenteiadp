@@ -1,30 +1,36 @@
-
 from langgraph.graph import StateGraph, END
-from getpass import getpass
-from sklearn.experimental import enable_iterative_imputer
-from agentai.nodes import (
-    node_load,
-    node_inspect
-)
-import operator
+from agentai.nodes import node_load, node_supervisor, node_inspect
 from agentai.modules.common import AgentState
+from typing import Literal
 
-# Build Workflow
+def should_continue(state: AgentState) -> Literal["inspect", "end"]:
+    """Determines the next step based on the supervisor's decision."""
+    if state.get("next", "").lower() == "inspect":
+        return "inspect"
+    else:
+        return "end"
+
 def build_workflow() -> StateGraph:
-    
     workflow = StateGraph(AgentState)
 
     workflow.add_node("loaddata", node_load)
+    workflow.add_node("supervisor", node_supervisor)
     workflow.add_node("inspect", node_inspect)
 
-    workflow.add_edge("loaddata", "inspect")
-
     workflow.set_entry_point("loaddata")
-    workflow.set_finish_point("inspect")
 
-    app = workflow.compile()
+    # Define as transições
+    workflow.add_edge("loaddata", "supervisor")
+    workflow.add_edge("inspect", "supervisor")
+    
+    # Adiciona a transição condicional do supervisor
+    workflow.add_conditional_edges(
+        "supervisor",
+        should_continue,
+        {
+            "inspect": "inspect",
+            "end": END,
+        },
+    )
 
-    from IPython.display import Image, display
-    print(app.get_graph().draw_ascii())
-
-    return app
+    return workflow.compile()

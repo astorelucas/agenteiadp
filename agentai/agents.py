@@ -1,32 +1,30 @@
+# agentai/agents.py
 
 from getpass import getpass
 import os
 import pandas as pd
 from sklearn.experimental import enable_iterative_imputer
-from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain.agents import AgentExecutor
 from langchain_community.chat_models import ChatDeepInfra
+from langgraph.prebuilt import create_react_agent
 from langchain_experimental.agents import create_pandas_dataframe_agent
 from agentai.tools import (
     inspection_tools
 )
 
-# -----Chat model Instantiation ----
-os.environ["DEEPINFRA_API_KEY"] = getpass("Enter your  key: ")
+os.environ["DEEPINFRA_API_KEY"] = getpass("Enter your key: ")
 llm = ChatDeepInfra(model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8")
 
-# Create Pandas DataFrame Agent for Inspection
 def create_inspection_agent(df: pd.DataFrame) -> AgentExecutor:
-    """Create specialized inspection agent for time series data"""
+    # ... (nenhuma alteração nesta função)
     return create_pandas_dataframe_agent(
         llm=llm,
         df=df,
         verbose=True,
         agent_type="zero-shot-react-description",
-        # max_iterations=10,
         allow_dangerous_code=True,
-        # early_stopping_method="generate",
         handle_parsing_errors=True,
-        extra_tools=inspection_tools,  # Add any additional tools if needed
+        extra_tools=inspection_tools,
         prefix="""You are a time series data inspection expert. Analyze the dataset thoroughly and 
         provide a detailed report with:
         1. Missing values analysis
@@ -55,4 +53,32 @@ def create_inspection_agent(df: pd.DataFrame) -> AgentExecutor:
         "has_infinity": false
         }}
         """
+    )
+
+
+def create_supervisor_agent() -> AgentExecutor:
+    """Creates the supervisor agent"""
+    return create_react_agent(
+        model=llm,
+        prompt=
+        """
+        You are a SUPERVISOR agent planning an Explanatory Data Analysis.
+        Your job is to coordinate actions by returning a decision plan.
+
+        Analyze the current state and results, then decide the next action.
+        
+        ALWAYS return ONLY a valid JSON object with the following fields:
+        - "output": Your reasoning for the decision.
+        - "next": The next action, which must be either "inspect" or "END".
+        - "msg": (optional) The instruction for the next agent.
+        
+        IMPORTANT: Use double quotes for all keys and string values in the JSON.
+
+        Example of a valid response:
+        {"output": "The data is loaded. I will now ask the inspector to summarize missing values.", "next": "inspect", "msg": "Summarize missing values and check for outliers."}
+
+        Another example of a valid response:
+        {"output": "The inspection is complete. No further actions are needed.", "next": "END"}
+        """,
+        tools=[]
     )

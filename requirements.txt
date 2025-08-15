@@ -12,6 +12,7 @@ duckduckgo-search
 pypdf
 tiktoken
 langgraph
+langgraph-supervisor
 grandalf
 pandas
 numpy

@@ -12,10 +12,12 @@ duckduckgo-search
 pypdf
 tiktoken
 langgraph
+langgraph-supervisor
 grandalf
 pandas
 numpy
 scikit-learn
 tabulate
 missingpy
-tensorly
+pyppeteer
+

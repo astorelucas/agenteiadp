@@ -21,3 +21,6 @@ tabulate
 missingpy
 pyppeteer
 
+matplotlib
+seaborn
+

@@ -1,26 +1,149 @@
-# from langchain_community.tools import WikipediaQueryRun
-# from langchain_community.utilities import WikipediaAPIWrapper
-# from langchain.tools import Tool
-# from datetime import datetime
+from langchain_community.tools import WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper
+from langchain.tools import Tool
 import pandas as pd
 import json
 import numpy as np
 import io
-# from sklearn.gaussian_process import GaussianProcessRegressor
-# from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 
 from langchain.tools import tool
-# from sklearn.impute import IterativeImputer
-# from sklearn.ensemble import RandomForestRegressor
-# from sklearn.gaussian_process import GaussianProcessRegressor
-# from sklearn.impute import KNNImputer  
+from sklearn.impute import IterativeImputer
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.impute import KNNImputer  
 
-from typing import List, Optional, Tuple, Dict
-# import json
+from typing import List, Optional, Tuple, Dict, Any
+from abc import ABC, abstractmethod
 
-# # Tools are things that the LLM/agent can use that we can
-# # either write ourself or we can bring in from things like
-# # the Langchain Community hub
+
+
+# abstract class 
+class ImputationStrategy(ABC):
+    @abstractmethod
+    def execute(self, df: pd.DataFrame) -> pd.DataFrame:
+        pass
+
+class GPImputationStrategy(ImputationStrategy):
+    def __init__(self, kernel=None):
+        self.kernel = kernel or C(1.0, (1e-3, 1e3)) * RBF(10, (1e-2, 1e2))
+
+    def execute(self, df: pd.DataFrame) -> pd.DataFrame:
+        df_final = df.copy()
+        numeric_cols = df_final.select_dtypes(include='number').columns
+
+        if len(numeric_cols) < 2:
+            print("GP method not applied. Requires at least 2 numeric columns.")
+            return df_final
+
+        imputer_gp = GaussianProcessRegressor(kernel=self.kernel)
+        
+        for col_to_impute in list(numeric_cols):
+            if df_final[col_to_impute].isnull().any():
+                
+                feature_cols = numeric_cols.drop(col_to_impute)
+                observed_idx = df_final[col_to_impute].notnull()
+                missing_idx = df_final[col_to_impute].isnull()
+
+                if feature_cols.empty or not missing_idx.any():
+                    continue
+
+                X_observed = df_final.loc[observed_idx, feature_cols]
+                y_observed = df_final.loc[observed_idx, col_to_impute]
+                X_missing = df_final.loc[missing_idx, feature_cols]
+
+                if X_observed.isnull().values.any() or X_missing.isnull().values.any():
+                    pre_imputer_knn = KNNImputer(n_neighbors=5)
+                    
+                    X_observed_imputed = pd.DataFrame(pre_imputer_knn.fit_transform(X_observed), columns=feature_cols, index=X_observed.index)
+                    X_missing_imputed = pd.DataFrame(pre_imputer_knn.transform(X_missing), columns=feature_cols, index=X_missing.index)
+                else:
+                    X_observed_imputed = X_observed
+                    X_missing_imputed = X_missing
+
+                imputer_gp.fit(X_observed_imputed, y_observed)
+                
+                imputed_values, _ = imputer_gp.predict(X_missing_imputed, return_std=True)
+                df_final.loc[missing_idx, col_to_impute] = imputed_values
+        
+        print("Robust Gaussian Process strategy executed successfully.")
+        return df_final
+
+class MICEImputationStrategy(ImputationStrategy):
+    """
+    Performs MICE (Multivariate Imputation by Chained Equations) on a DataFrame.
+    This function automatically isolates numeric columns, applies imputation using RandomForestRegressor, 
+    and then reintegrates the original non-numeric columns.
+    The function MUST be called with the complete DataFrame as an argument (e.g., imputacao_mice(df)).
+    It returns the complete DataFrame with the imputed numeric values.
+    """
+    def __init__(self, n_estimators: int = 10, random_state: int = 0):
+        self.n_estimators = n_estimators
+        self.random_state = random_state
+
+    def execute(self, df: pd.DataFrame) -> pd.DataFrame:
+        df_final = df.copy()
+        numeric_cols = df_final.select_dtypes(include='number').columns
+        if len(numeric_cols) == 0:
+            return df_final
+        
+        df_numeric = df_final[numeric_cols].copy()
+        for col in df_numeric.columns:
+            df_numeric[f'{col}_lag1'] = df_numeric[col].shift(1)
+
+        imputer = IterativeImputer(
+            estimator=RandomForestRegressor(n_estimators=self.n_estimators),
+            random_state=self.random_state
+        )
+        imputed_matrix = imputer.fit_transform(df_numeric)
+        df_imputed_temp = pd.DataFrame(imputed_matrix, columns=df_numeric.columns, index=df_numeric.index)
+        df_final[numeric_cols] = df_imputed_temp[numeric_cols]
+        print("MICE strategy executed.")
+        return df_final
+
+class KNNImputationStrategy(ImputationStrategy):
+    """
+    Performs K-Nearest Neighbors (KNN) imputation on a DataFrame.
+    This method is ideal for datasets with local patterns where similar data points have similar values (e.g., sensor or spatial data).
+    It is best used on small to medium-sized datasets and when data is Missing Completely at Random (MCAR) or at Random (MAR).
+    For each missing value, it finds the 'k' most similar records and imputes the value based on their average (or median/mode).
+    It returns the complete DataFrame with the imputed values.
+    """
+    def __init__(self, n_neighbors: int = 5):
+        self.n_neighbors = n_neighbors
+
+    def execute(self, df: pd.DataFrame) -> pd.DataFrame:
+        df_final = df.copy()
+        numeric_cols = df_final.select_dtypes(include='number').columns
+        if len(numeric_cols) == 0:
+            return df_final
+
+        df_numeric = df_final[numeric_cols]
+        imputer = KNNImputer(n_neighbors=self.n_neighbors)
+        df_filled_matrix = imputer.fit_transform(df_numeric)
+        df_filled = pd.DataFrame(df_filled_matrix, columns=numeric_cols, index=df_numeric.index)
+        df_final[numeric_cols] = df_filled
+        print("KNN strategy executed.")
+        return df_final
+
+# factory strategy :)
+class ImputationStrategyFactory:
+    _strategies = {
+        "gp": GPImputationStrategy,
+        "mice": MICEImputationStrategy,
+        "knn": KNNImputationStrategy,
+    }
+
+    def create_strategy(self, name: str, **kwargs: Any) -> ImputationStrategy:
+        strategy_class = self._strategies.get(name)
+        if not strategy_class:
+            raise ValueError(f"'{name}' strategy not recognized")
+        try:
+            return strategy_class(**kwargs)
+        except TypeError as e:
+            raise TypeError(f"Invalid parameters for '{name}': {e}")
+
 
 # @tool
 def analyze_missing_values(df: pd.DataFrame) -> dict:
@@ -31,136 +154,6 @@ def analyze_missing_values(df: pd.DataFrame) -> dict:
         "time_gaps": pd.to_datetime(df.index).to_series().diff().value_counts().to_dict()
     }
     return analysis
-
-# @tool
-# def imputacao_gp() -> str:
-#     """
-#     **Processos Gaussianos (GP)**
-
-#     **Para que serve**: Modela os dados como uma distribuição de probabilidade, permitindo imputar valores e, crucialmente, estimar a incerteza dessas imputações.
-
-#     **Uso ideal**:
-#     - Domínios onde a confiança na imputação é crítica (ex: dados financeiros, médicos, de segurança).
-#     - Séries temporais com relações não-lineares complexas.
-#     - Datasets de tamanho pequeno a médio.
-
-#     **Pontos Fortes**:
-#     - Fornece uma estimativa da incerteza (variância) para cada valor imputado.
-#     - Altamente flexível para capturar diferentes tipos de tendências nos dados através de "kernels".
-
-#     **Limitações**:
-#     - Custo computacional muito alto, com complexidade cúbica ($O(n^3)$), tornando-o inviável para grandes datasets.
-#     - A performance depende muito da escolha do kernel e seus hiperparâmetros.
-
-#     **Como age**:
-#     1. Assume que qualquer conjunto de pontos da série temporal segue uma distribuição Gaussiana multivariada.
-#     2. "Aprende" os parâmetros dessa distribuição (a função de covariância ou kernel) a partir dos dados observados.
-#     3. Usa a distribuição condicionada para prever a média (valor imputado) e a variância (incerteza) dos pontos ausentes.
-
-#     **Custo Computacional**: Muito Alto.
-#     """
-#     global df
-#     imputer = GaussianProcessRegressor(kernel=C(1.0, (1e-3, 1e3)) * RBF(10, (1e-2, 1e2)))
-#     numeric_cols = df.select_dtypes(include='number').columns
-
-#     if len(numeric_cols) < 2:
-#         return "Método GP não aplicado. Requer pelo menos 2 colunas numéricas para usar uma como preditora da outra."
-
-#     try:
-#         for col in numeric_cols:
-#             if df[col].isnull().any():
-#                 feature_cols = numeric_cols.drop(col)
-                
-#                 observed_idx = df[col].notnull()
-#                 missing_idx = df[col].isnull()
-
-#                 if not feature_cols.empty and missing_idx.any():
-#                     X_train = df.loc[observed_idx, feature_cols]
-#                     y_train = df.loc[observed_idx, col]
-#                     X_test = df.loc[missing_idx, feature_cols]
-
-#                     imputer.fit(X_train, y_train)
-#                     imputed_values, _ = imputer.predict(X_test, return_std=True)
-                    
-#                     df.loc[missing_idx, col] = imputed_values
-
-#         return "Processo Gaussiano aplicado. Valores ausentes imputados com base em correlações não-lineares."
-#     except Exception as e:
-#         return f"Erro ao aplicar Processo Gaussiano: {e}"
-
-# @tool
-# def imputacao_mice() -> str:
-#     """
-#     **MICE (Multivariate Imputation by Chained Equations)**
-
-#     **Para que serve**: Imputa valores ausentes de forma iterativa, usando as outras colunas como preditores, ideal para relações complexas entre variáveis.
-
-#     **Uso ideal**:
-#     - Dados ausentes com padrão Aleatório (MAR - Missing at Random), onde a ausência de um valor pode ser explicada por outras variáveis.
-#     - Relações lineares ou não-lineares entre as variáveis.
-#     - Datasets tabulares multivariados.
-
-#     **Pontos Fortes**:
-#     - Muito flexível, pois modela cada coluna condicionalmente.
-#     - Pode capturar relações complexas se o estimador for poderoso (como RandomForest).
-
-#     **Limitações**:
-#     - O processo é iterativo e pode ser lento para datasets grandes ou com muitos ciclos.
-#     - Assume que uma relação condicional existe entre as variáveis, o que pode não ser verdade.
-
-#     **Como age**:
-#     1. Preenche temporariamente todos os `NaN`s com uma estimativa simples (ex: média).
-#     2. Para cada variável (coluna), define-a como a variável alvo e as outras como preditoras.
-#     3. Treina um modelo (neste caso, `RandomForestRegressor`) para prever os valores originalmente ausentes naquela coluna.
-#     4. Repete o passo 3 para todas as colunas em ciclos, refinando as imputações até que os valores se estabilizem.
-
-#     **Custo Computacional**: Médio.
-#     """
-#     global df
-#     df_numeric = df.select_dtypes(include='number').copy()
-
-#     for col in df_numeric.columns:
-#         df_numeric[f'{col}_lag1'] = df_numeric[col].shift(1)
-
-#     imputer = IterativeImputer(
-#         estimator=RandomForestRegressor(n_estimators=10),
-#         random_state=0
-#     )
-#     imputed_matrix = imputer.fit_transform(df_numeric)
-#     df_imputed_temp = pd.DataFrame(imputed_matrix, columns=df_numeric.columns, index=df_numeric.index)
-
-#     original_numeric_cols = df.select_dtypes(include='number').columns
-#     df[original_numeric_cols] = df_imputed_temp[original_numeric_cols]
-
-#     return "MICE aplicado. Relações entre colunas e lags temporais foram consideradas."
-
-# @tool
-# def imputacao_k_nearest_neighbors(k=5): 
-#     """
-#     **K-Nearest Neighbors (KNN)**
-#     **Uso ideal**:
-#     - Dados com padrões locais, onde valores próximos no tempo ou no espaço de características são semelhantes.
-#     - Missing Data Completamente Aleatório (MCAR) ou Aleatório (MAR).
-#     - Datasets de pequeno a médio porte, onde a busca por vizinhos não é computacionalmente proibitiva.
-
-#     **Exemplo**: Imputar a temperatura de uma estação meteorológica baseando-se nos registros de horas ou dias próximos.
-
-#     **Custo**: Baixo a Médio.
-
-#     **Como age**:
-#     1. Para cada ponto de dados ausente, o algoritmo identifica os 'k' vizinhos mais próximos no espaço de características (outras variáveis).
-#     2. O valor ausente é imputado calculando a média (ou outra métrica) dos valores desses 'k' vizinhos.
-#     3. A premissa é que um ponto de dados provavelmente será semelhante aos seus vizinhos mais próximos.
-#     """
-#     global df
-#     df_nulls = df.copy().drop('timestamp', axis=1).select_dtypes(include='number')
-#     imputer = KNNImputer(n_neighbors=k)
-#     df_filled = pd.DataFrame(imputer.fit_transform(df_nulls),
-#                              columns=df_nulls.columns,
-#                              index=df_nulls.index)    
-#     df[df_filled.columns] = df_filled 
-
-#     return "KNN aplicado ao dataframe original."
 
 # # Ferramentas Auxiliares
 # @tool

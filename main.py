@@ -3,7 +3,6 @@ import sys
 import os
 from uuid import uuid4
 
-# A importação principal agora é a classe que criamos
 from agentai.workflow import WorkflowExecutor
 
 load_dotenv()
@@ -35,12 +34,18 @@ def execute_pipeline():
 
     
     # initial prompt
-    initial_prompt = "Perform a complete exploratory data analysis on the quality of this dataset. Start with a general overview, then delve into the most important points you deem necessary, such as missing values, descriptive statistics, and potential outliers. Provide a final summary upon completion."
+    initial_prompt = """
+    Perform a complete exploratory data analysis on the quality of this dataset.
+    Start with a general overview, then delve into the most important points you deem necessary, such as missing values, descriptive statistics, potential outliers.
+    If there are missing values, you MUST perform imputation.  
+    Provide a final summary upon completion.
+    """
     
     print("\n--- INICIANDO EXECUÇÃO DO GRAFO ---")
     executor.invoke(initial_message=initial_prompt, thread_id=thread_id)
     print("--- FIM DA EXECUÇÃO DO GRAFO ---\n")
-
+    print("\n--- DataFrame Final Após a Execução ---")
+    print(executor.df)
 
 if __name__ == "__main__":
     execute_pipeline()

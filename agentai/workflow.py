@@ -7,8 +7,9 @@ from uuid import uuid4
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage
-from agentai.agents import create_pandas_agent, create_supervisor_agent
+from agentai.agents import create_pandas_agent, create_supervisor_agent, create_imputator_agent
 from agentai.modules.common import AgentState
+from agentai.tools import ImputationStrategyFactory
 
 
 class WorkflowExecutor:
@@ -18,6 +19,7 @@ class WorkflowExecutor:
         except Exception as e:
             raise ValueError(f"Falha ao carregar o dataset: {e}")
         
+        self.factory = ImputationStrategyFactory()
         self.graph = self._build_graph()
 
     def _feature_engineering_node(self, state: AgentState) -> dict:
@@ -58,17 +60,22 @@ class WorkflowExecutor:
         workflow.add_node("supervisor", self._supervisor_node)
         workflow.add_node("inspect", self._pandas_node)
         workflow.add_node("feature_engineer", self._feature_engineering_node)
-
+        workflow.add_node("imputator", self._imputator_node)
+        
         workflow.set_entry_point("supervisor")
 
         workflow.add_edge("inspect", "supervisor")
         workflow.add_edge("feature_engineer", "supervisor") 
+        workflow.add_edge("imputator", "supervisor")
 
+
+        
         workflow.add_conditional_edges(
             "supervisor",
             self._should_continue,
             {
                 "inspect": "inspect",
+                "imputator": "imputator",
                 "feature_engineer": "feature_engineer", 
                 "end": END,
             },
@@ -77,12 +84,10 @@ class WorkflowExecutor:
         memory = MemorySaver()
         return workflow.compile(checkpointer=memory)
 
-    def _should_continue(self, state: AgentState) -> Literal["inspect","feature_engineer", "end"]:
-        next_node = state.get("next", "").lower()
-        if next_node == "inspect":
-            return "inspect"
-        elif next_node == "feature_engineer":
-            return "feature_engineer" 
+    def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer","end"]:
+        next_decision = state.get("next", "").lower()
+        if  next_decision in ["inspect", "imputator"]:
+            return next_decision
         else:
             return "end"
 
@@ -110,6 +115,42 @@ class WorkflowExecutor:
                 current_input = f"Your previous attempt failed with this error: {e}. Please correct your code and try again to accomplish the original task: {msg}"
         
         return {"subagents_report": inspection_report, "logs": logs}
+    
+    def _imputator_node(self, state:AgentState) -> dict:
+        context = state.get("msg", "")
+        logs = state.get("logs", [])
+        logs.append("Executing imputation node.")
+        
+        imputator_agent = create_imputator_agent()
+        response = imputator_agent.invoke({"messages": [HumanMessage(content=context)]})
+        
+        raw_output = str(response.get("messages", [])[-1].content)
+        json_str_match = re.search(r'\{.*\}', raw_output, re.DOTALL)
+
+        if not json_str_match:
+            report = f"Error: Imputator agent failed to produce valid JSON. Output: {raw_output}"
+            logs.append(report)
+            return {"subagents_report": report, "logs": logs}
+        
+        try:
+            decision = json.loads(json_str_match.group(0))
+            method = decision.get("method")
+            params = decision.get("params", {})
+            
+            logs.append(f"Imputator agent decided on method '{method}' with params {params}.")
+            
+            strategy = self.factory.create_strategy(name=method, **params)
+            imputed_df = strategy.execute(self.df)
+            self.df = imputed_df
+            report = f"Imputation using '{method}' strategy completed successfully."
+            logs.append(report)
+
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
+            report = f"Error processing imputator agent decision: {e}. Raw output: {raw_output}"
+            logs.append(report)
+            
+        return {"subagents_report": report, "logs": logs}
+    
 
     def _supervisor_node(self, state: AgentState) -> dict:
         supervisor_agent = create_supervisor_agent()
@@ -135,21 +176,18 @@ class WorkflowExecutor:
         json_str_match = re.search(r'\{.*\}', raw_output, re.DOTALL)
         
         if not json_str_match:
-            # Logs de erro em inglês
             logs.append(f"Supervisor failed to produce JSON. Output: {raw_output}")
             return {"next": "END", "logs": logs}
         
         try:
             plan = json.loads(json_str_match.group(0))
         except json.JSONDecodeError:
-            # Logs de erro em inglês
             logs.append(f"Supervisor produced invalid JSON. Output: {json_str_match.group(0)}")
             return {"next": "END", "logs": logs}
         
         next_step = plan.get("next", "END")
         msg_out = plan.get("msg", state.get("msg"))
         output = plan.get("output", "")
-        # Log de decisão em inglês
         logs.append(f"Supervisor decision: {output}")
         
         return {

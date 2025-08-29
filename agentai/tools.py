@@ -243,7 +243,8 @@ def inspect_data(df: str) -> Dict:
 #         return filename
 #     except Exception as e:
 #         return f"Error saving file: {str(e)}"
-    
+
+
 
 inspection_tools = [inspect_data]
 # cleaning_tools = [clean_data]

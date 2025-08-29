@@ -8,9 +8,7 @@ from langchain.agents import AgentExecutor
 from langchain_community.chat_models import ChatDeepInfra
 from langgraph.prebuilt import create_react_agent
 from langchain_experimental.agents import create_pandas_dataframe_agent
-from agentai.tools import (
-    inspection_tools
-)
+from agentai.tools import inspection_tools
 
 os.environ["DEEPINFRA_API_KEY"] = getpass("Enter your key: ")
 # llm = ChatDeepInfra(model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8")
@@ -55,7 +53,8 @@ def create_supervisor_agent() -> AgentExecutor:
         Based on the current state, decide what to do next. The possible actions are:
         1.  **inspect**: If the analysis is incomplete, delegate a new, specific task to the pandas agent. The task should be a logical next step towards the main goal.
         2.  **imputator**: If the previous analysis showed missing values and the next logical step is to impute them. You must delegate this to the imputation specialist.
-        3.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete.
+        3.  **feature_engineer**: If the task is to create new columns or features (like rolling averages, lags, etc.), delegate this to the feature engineering node.
+        4.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete.
 
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.

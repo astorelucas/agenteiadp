@@ -22,18 +22,52 @@ class WorkflowExecutor:
         self.factory = ImputationStrategyFactory()
         self.graph = self._build_graph()
 
+    def _feature_engineering_node(self, state: AgentState) -> dict:
+        logs = state.get("logs", [])
+        msg = state.get("msg", "")
+        df = self.df # Acessa o DataFrame da classe
+
+        try:
+            # Lógica para Média Móvel
+            if "rolling average" in msg and "temperature" in msg:
+                logs.append("Executing: Create rolling average for temperature.")
+                new_col = 'temperature_rolling_avg_3h'
+                df[new_col] = df['temperature'].rolling(window=3, min_periods=1).mean()
+                report = f"Successfully created column: {new_col}"
+
+            # Lógica para Desvio Padrão Móvel
+            elif "standard deviation" in msg and "temperature" in msg:
+                logs.append("Executing: Create rolling standard deviation for temperature.")
+                new_col = 'temperature_rolling_std_3h'
+                df[new_col] = df['temperature'].rolling(window=3, min_periods=1).std().fillna(0)
+                report = f"Successfully created column: {new_col}"
+            
+            else:
+                report = "No specific feature engineering task found in the instruction."
+
+            self.df = df # Salva o DataFrame modificado de volta na classe
+            logs.append(report)
+            return {"subagents_report": report, "logs": logs}
+
+        except Exception as e:
+            error_report = f"Error in feature engineering node: {e}"
+            logs.append(error_report)
+            return {"subagents_report": error_report, "logs": logs}
+
     def _build_graph(self):
         workflow = StateGraph(AgentState)
 
         workflow.add_node("supervisor", self._supervisor_node)
         workflow.add_node("inspect", self._pandas_node)
+        workflow.add_node("feature_engineer", self._feature_engineering_node)
         workflow.add_node("imputator", self._imputator_node)
-
         
         workflow.set_entry_point("supervisor")
 
         workflow.add_edge("inspect", "supervisor")
+        workflow.add_edge("feature_engineer", "supervisor") 
         workflow.add_edge("imputator", "supervisor")
+
 
         
         workflow.add_conditional_edges(
@@ -42,6 +76,7 @@ class WorkflowExecutor:
             {
                 "inspect": "inspect",
                 "imputator": "imputator",
+                "feature_engineer": "feature_engineer", 
                 "end": END,
             },
         )
@@ -49,9 +84,7 @@ class WorkflowExecutor:
         memory = MemorySaver()
         return workflow.compile(checkpointer=memory)
 
-
-
-    def _should_continue(self, state: AgentState) -> Literal["inspect", "imputator", "end"]:
+    def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer","end"]:
         next_decision = state.get("next", "").lower()
         if  next_decision in ["inspect", "imputator"]:
             return next_decision
@@ -170,21 +203,25 @@ class WorkflowExecutor:
         config = {"configurable": {"thread_id": thread_id}}
         initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message}
      
-        final_state = self.graph.invoke(initial_state, config=config, recursion_limit=15)
+        final_state = self.graph.invoke(initial_state, config=config)
+        #, recursion_limit=15
         
         print("\n--- RESULTADO FINAL DO GRAFO ---")
         for key, value in final_state.items():
             if key in ['subagents_report', 'next']:
                 continue
             print(f"  {key}: {value}")
+        return final_state
 
 
     def stream(self, initial_message: str, thread_id: str):
         config = {"configurable": {"thread_id": thread_id}}
         initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message}
         
-        for event in self.graph.stream(initial_state, config=config, recursion_limit=15):
+        for event in self.graph.stream(initial_state, config=config):
+            #, recursion_limit=15
             for key, value in event.items():
                 print(f"--- Evento do Nó: {key} ---")
                 print(value)
                 print("\n")
+

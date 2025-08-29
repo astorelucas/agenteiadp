@@ -6,6 +6,7 @@ import pandas as pd
 import json
 import numpy as np
 import io
+import os
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 import seaborn as sns
@@ -257,6 +258,11 @@ def inspect_data(df: str) -> Dict:
 def make_plot_tools(df: pd.DataFrame, images_path: str) -> List:
     """ Create plotting tools with the given DataFrame
     """
+    
+    # Confirmar que o diretório de imagens existe
+    if not os.path.exists(images_path):
+        os.makedirs(images_path, exist_ok=True) 
+
     @tool
     def plot_time_series(cols_str: str = None):
         """

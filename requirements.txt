@@ -20,4 +20,4 @@ scikit-learn
 tabulate
 missingpy
 pyppeteer
-
+streamlit

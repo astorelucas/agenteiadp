@@ -35,7 +35,12 @@ def execute_pipeline():
 
     
     # initial prompt
-    initial_prompt = "Perform a complete exploratory data analysis on the quality of this dataset. Start with a general overview, then delve into the most important points you deem necessary, such as missing values, descriptive statistics, and potential outliers. Provide a final summary upon completion."
+    initial_prompt = """
+    First, create a feature for the 3-hour rolling average of the 'temperature' column.
+    Second, create another feature for the 3-hour rolling standard deviation of the 'temperature' column.
+    Finally, provide a summary of the updated DataFrame, showing the first few rows to confirm that both new columns ('temperature_rolling_avg_3h' and 'temperature_rolling_std_3h') have been created correctly.
+    """
+    #"Perform a complete exploratory data analysis on the quality of this dataset. Start with a general overview, then delve into the most important points you deem necessary, such as missing values, descriptive statistics, and potential outliers. Provide a final summary upon completion."
     
     print("\n--- INICIANDO EXECUÇÃO DO GRAFO ---")
     executor.invoke(initial_message=initial_prompt, thread_id=thread_id)

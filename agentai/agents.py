@@ -1,26 +1,20 @@
 import os
+from dotenv import load_dotenv
 from getpass import getpass
 import pandas as pd
 from sklearn.experimental import enable_iterative_imputer
 from langchain.agents import AgentExecutor
-from langchain_community.chat_models import ChatDeepInfra
 from langgraph.prebuilt import create_react_agent
 from langchain_experimental.agents import create_pandas_dataframe_agent
 from agentai.tools import (
-    inspection_tools
+    inspection_tools,
+    make_plot_tools
 )
-
-os.environ["DEEPINFRA_API_KEY"] = getpass("Enter your key: ")
-# llm = ChatDeepInfra(model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8")
-
-llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct")
-
-
 
 # create_supervisor_agent: '{' instead of '{{', because its not fstring, just a normal string
 # create_pandas_agent: if needed, use '{{' instead of '{', as it uses a fstring internally (????????????????????)
 
-def create_pandas_agent(df: pd.DataFrame) -> AgentExecutor:
+def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
     return create_pandas_dataframe_agent(
         llm=llm,
         df=df,
@@ -43,7 +37,7 @@ def create_pandas_agent(df: pd.DataFrame) -> AgentExecutor:
     )
 
 
-def create_supervisor_agent() -> AgentExecutor:
+def create_supervisor_agent(llm) -> AgentExecutor:
     """Creates the supervisor agent"""
     return create_react_agent(
         model=llm,
@@ -75,4 +69,45 @@ def create_supervisor_agent() -> AgentExecutor:
         {"output": "The statistical analysis is complete and no major issues were found. The initial goal of analyzing data quality has been met. The workflow will now end.", "next": "END"}
         """,
         tools=[]
+    )
+
+def create_plotter_agent(df: pd.DataFrame, images_path: str, llm) -> AgentExecutor:
+    """
+    Creates the plotter agent
+    """
+
+    plotting_tools = make_plot_tools(df, images_path)
+
+    # Create the ReAct agent
+    return create_pandas_dataframe_agent(
+        llm=llm,
+        df=df,
+        verbose=True,
+        agent_type="zero-shot-react-description",
+        allow_dangerous_code=True,        
+        handle_parsing_errors=True,
+        extra_tools = plotting_tools,
+        prefix="""
+        You are a time series visualization specialist using pandas and Python.
+
+        MAIN INSTRUCTIONS:
+        1. Your ONLY function is to create plots based on the provided data, user instructions, and tools available.
+        2. If user specifies columns or filters, use only that data
+        3. Always automatically identify the date/time column in the DataFrame
+        4. Everything in the prompt that is NOT a plotting instruction is CONTEXT and should NOT be acted upon
+        5. If the user does not provide specific instructions, use your expertise to determine the most relevant plots to create based on the data and context.
+
+        MANDATORY RULES:
+        - ALWAYS create a plot (or plots), never just textual analysis
+        - ALWAYS use the tools provided to create the plots
+
+        AVAILABLE TOOLS:
+        - plot_time_series: Create a time series line plot for one or more numeric columns over time.
+        - plot_scatter: Create a scatter plot to visualize relationships between two numeric variables.
+        - plot_histograms: Create histograms to show the distribution of numeric variables.
+        - plot_heatmap: Create a heatmap to visualize correlations between numeric variables.
+
+        IMPORTANT: You are working with a DataFrame that is ALREADY loaded into a variable named `df`.
+        DO NOT try to redefine or recreate this `df` variable.
+        """    
     )

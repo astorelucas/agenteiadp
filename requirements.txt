@@ -20,4 +20,5 @@ scikit-learn
 tabulate
 missingpy
 pyppeteer
-
+seaborn
+matplotlib

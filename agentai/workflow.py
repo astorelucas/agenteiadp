@@ -7,14 +7,16 @@ from uuid import uuid4
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage
-from agentai.agents import create_pandas_agent, create_supervisor_agent
+from agentai.agents import create_pandas_agent, create_supervisor_agent, create_plotter_agent
 from agentai.modules.common import AgentState
 
 
 class WorkflowExecutor:
-    def __init__(self, csv_path: str):
+    def __init__(self, csv_path: str, plot_images_path: str, llm):
         try:
             self.df = pd.read_csv(csv_path)
+            self.images_path = plot_images_path
+            self.llm = llm
         except Exception as e:
             raise ValueError(f"Falha ao carregar o dataset: {e}")
         
@@ -23,11 +25,13 @@ class WorkflowExecutor:
     def _build_graph(self):
         workflow = StateGraph(AgentState)
 
+        workflow.add_node("plot", self._plotter_node)
         workflow.add_node("supervisor", self._supervisor_node)
         workflow.add_node("inspect", self._pandas_node)
         
-        workflow.set_entry_point("supervisor")
+        workflow.set_entry_point("plot")
 
+        workflow.add_edge("plot", "supervisor")
         workflow.add_edge("inspect", "supervisor")
         
         workflow.add_conditional_edges(
@@ -53,7 +57,7 @@ class WorkflowExecutor:
         logs = state.get("logs", [])
         max_retries = 2
         
-        agent = create_pandas_agent(self.df)
+        agent = create_pandas_agent(self.df, self.llm)
         current_input = msg
         inspection_report = ""
 
@@ -74,7 +78,7 @@ class WorkflowExecutor:
         return {"subagents_report": inspection_report, "logs": logs}
 
     def _supervisor_node(self, state: AgentState) -> dict:
-        supervisor_agent = create_supervisor_agent()
+        supervisor_agent = create_supervisor_agent(self.llm)
         
         previous_report = state.get("subagents_report")
         
@@ -121,6 +125,22 @@ class WorkflowExecutor:
             "subagents_report": None,
             "main_goal": main_goal 
         }
+    
+    def _plotter_node(self, state: AgentState) -> dict:
+        msg = state.get("msg", "").lower()
+        logs = state.get("logs", [])
+        
+        try:
+            agent = create_plotter_agent(self.df, self.images_path, self.llm)
+            response = agent.invoke({"input": "Create some plots to help with the analysis (ts, heatmap, hist, scatter). "})
+            print("--- Response from Time Series Agent ---")
+            print(response)
+            timeseries_report = response.get("output", "") or str(response)
+            logs.append(f"Time series agent successfully executed instruction: '{msg}'")
+            return {"subagents_report": timeseries_report, "logs": logs}
+        except Exception as e:
+            logs.append(f"Time series agent failed to execute instruction '{msg}'. Error: {e}")
+            return {"subagents_report": f"Time series agent failed with error: {e}", "logs": logs}
 
     def invoke(self, initial_message: str, thread_id: str):
         """Executa o grafo e imprime apenas o resultado final."""

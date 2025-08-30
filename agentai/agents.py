@@ -27,7 +27,6 @@ def create_pandas_agent(df: pd.DataFrame) -> AgentExecutor:
         verbose=True,
         agent_type="zero-shot-react-description",
         allow_dangerous_code=True,
-        handle_parsing_errors=True,
         extra_tools= inspection_tools,
         prefix="""You are a data analysis expert working with a pandas DataFrame.
         Your primary goal is to execute a specific task given to you and report the results.

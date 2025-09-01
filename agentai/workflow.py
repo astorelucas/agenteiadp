@@ -86,7 +86,7 @@ class WorkflowExecutor:
 
     def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer","end"]:
         next_decision = state.get("next", "").lower()
-        if  next_decision in ["inspect", "imputator"]:
+        if  next_decision in ["inspect", "imputator", "feature_engineer"]:
             return next_decision
         else:
             return "end"
@@ -214,6 +214,7 @@ class WorkflowExecutor:
         return final_state
 
 
+    # same as 'invoke' but better for debug (should be removed when we start using langsmith correctly)
     def stream(self, initial_message: str, thread_id: str):
         config = {"configurable": {"thread_id": thread_id}}
         initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message}

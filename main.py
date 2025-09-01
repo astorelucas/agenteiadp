@@ -24,14 +24,12 @@ def execute_pipeline():
         png_bytes = executor.graph.get_graph().draw_mermaid_png()
         with open("workflow_mermaid_graph.png", "wb") as f:
             f.write(png_bytes)
-        print("grafo  salvo como 'workflow_mermaid_graph.png'")
+        print("Grafo salvo como 'workflow_mermaid_graph.png'")
     except Exception as e:
-        print(f"não foi possível gerar a imagem do grafo: {e}")
-
+        print(f"Não foi possível gerar a imagem do grafo: {e}")
 
     # unique id
     thread_id = str(uuid4())
-
     
     # initial prompt
     initial_prompt = "Perform a complete exploratory data analysis on the quality of this dataset. Start with a general overview, then delve into the most important points you deem necessary, such as missing values, descriptive statistics, and potential outliers. Also create features. Provide a final summary upon completion."

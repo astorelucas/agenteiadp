@@ -27,6 +27,7 @@ from typing import List, Optional, Tuple, Dict
 # # the Langchain Community hub
 
 # @tool
+
 def analyze_missing_values(df: pd.DataFrame) -> dict:
     """Analyze missing values pattern in time series data"""
     analysis = {
@@ -270,6 +271,7 @@ def make_plot_tools(df: pd.DataFrame, images_path: str) -> List:
         If 'cols_str' is None, plots all numeric columns.
         Args:
             cols_str: List of column names to plot (str). If None, plots all numeric columns.
+            is_before_dp: Flag indicating if the data is before data processing (bool).
         Returns:
             dict: Success message or error details
         """
@@ -364,32 +366,46 @@ def make_plot_tools(df: pd.DataFrame, images_path: str) -> List:
 
 
     @tool
-    def plot_scatter(x: str, y: str):
+    def plot_scatter(two_cols_str: str):
         """
-        Create a scatter plot between two specified columns.
+        Create an enhanced scatter plot between two specified columns.
 
         Args:
-            x: Column name for the x-axis (str).
-            y: Column name for the y-axis (str).
+            two_cols_str: Comma-separated string of two column names to plot (str).
+
         Returns:
             dict: Success message or error details
-
         """
         try:
-            plt.figure(figsize=(8, 6))
-            sns.scatterplot(data=df, x=x, y=y)
-            plt.title(f"Scatter Plot: {x} vs {y}")
+            # Validar se o DataFrame não está vazio
+            if df.empty:
+                return {"error": "DataFrame is empty"}
+            
+            cols = two_cols_str.split(",") if two_cols_str else None
+
+            # Se cols não foi especificado, retornar erro
+            if not cols:
+                return {"error": "No columns found to plot"}
+            
+            # Se cols não contém exatamente 2 colunas, retornar erro
+            if len(cols) != 2:
+                return {"error": "Please provide exactly two columns for scatter plot"}
+            
+            x, y = cols
+            
+            plt.scatter(df[x], df[y])
             plt.xlabel(x)
             plt.ylabel(y)
-            plt.grid(True)
-            plt.savefig(f"{images_path}/scatter_plot_{x}_vs_{y}.png")
+            plt.title(f"{x} vs {y}")
+            plt.tight_layout()
+            plt.savefig(f"{images_path}/scatter_plot_{x}_vs_{y}.png", bbox_inches="tight", dpi=300)
             plt.close()
 
-            return {"msg": "Scatter plot created successfully."}
+            return {"msg": f"Scatter plot created successfully for {x} vs {y}"}
 
         except Exception as e:
-            return {"error": str(e)}
-
+            return {"error": f"Unexpected error: {str(e)}"}
+    
     @tool
     def plot_histograms(cols_str: str = None, bins: int = 15):
         """
@@ -398,10 +414,12 @@ def make_plot_tools(df: pd.DataFrame, images_path: str) -> List:
         Args:
             cols_str: List of column names to plot (str). If None, plots all numeric columns.
             bins: Number of bins for the histograms (int).
+            is_before_dp: Flag indicating if the data is before data processing (bool).
 
         If 'cols' is None, plot all numeric columns.
         """
         try:
+
             cols = cols_str.split(",") if cols_str else None
             if cols is None:
                 cols = df.select_dtypes(include="number").columns.tolist()

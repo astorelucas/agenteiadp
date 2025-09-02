@@ -33,6 +33,8 @@ def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         - Carefully follow the user's instruction.
         - Use the available tools to perform the analysis.
         - Your final response MUST BE a clear report of your findings.
+
+        DO NOT CREATE PLOTS. Your only job is to analyze the data and report the results, along with possible plots based on the analysis.
         """
     )
 

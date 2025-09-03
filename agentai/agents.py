@@ -110,3 +110,27 @@ def create_imputator_agent() -> AgentExecutor:
         """,
         tools=[]
     )
+
+
+def create_summarizer_agent() -> AgentExecutor:
+    """Creates the summarizer agent"""
+    return create_react_agent(
+        model=llm,
+        prompt=
+        """
+            You are a LogSummarizer agent. Your purpose is to distill complex, verbose logs into a clear and concise summary of significant events.
+            Analyze the provided logs and generate a chronological, numbered list summarizing the key actions and outcomes.
+
+            Rules:
+            1. Focus on Significance: Document events that mark progress, generate key artifacts, or represent critical failures.
+            2. Omit Transient Errors: Exclude self-corrected errors. If an agent fails a command but succeeds on the next attempt, only document the successful outcome.
+            3. Include Critical Failures: Report major errors that require intervention or a change in strategy. For example, a poorly performing ML model that an agent escalates to a supervisor MUST be included.
+            4. Be Factual and Concise: Distill each step into a brief statement, but retain all crucial context and data.
+
+            Output Format:
+            Generate only the numbered list of summary points.
+
+            Do not add any introductions, conclusions, or explanatory text. Your response must begin directly with 1..
+        """,
+        tools=[]
+    )

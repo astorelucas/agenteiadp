@@ -8,6 +8,7 @@ from typing import TypedDict, Optional
 class AgentState(TypedDict):
     # persistent states
     logs: list[str]
+    output: str
     main_goal: str
 
     # ephemeral states

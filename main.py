@@ -24,10 +24,9 @@ def execute_pipeline():
         png_bytes = executor.graph.get_graph().draw_mermaid_png()
         with open("workflow_mermaid_graph.png", "wb") as f:
             f.write(png_bytes)
-        print("grafo  salvo como 'workflow_mermaid_graph.png'")
+        print("Grafo salvo como 'workflow_mermaid_graph.png'")
     except Exception as e:
-        print(f"não foi possível gerar a imagem do grafo: {e}")
-
+        print(f"Não foi possível gerar a imagem do grafo: {e}")
 
     # unique ID
     thread_id = str(uuid4())

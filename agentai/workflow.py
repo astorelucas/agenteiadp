@@ -61,7 +61,7 @@ class WorkflowExecutor:
             if "rolling average" in msg and "temperature" in msg:
                 logs.append("Executing: Create rolling average for temperature.")
                 new_col = 'temperature_rolling_avg_3h'
-                df[new_col] = df['temperature'].rolling(window=3, min_periods=1).mean()
+                df[new_col] = df['temperature'].rolling(window=3, min_periods=1).mean().fillna(method="bfill")
                 report = f"Successfully created column: {new_col}"
 
             # Lógica para Desvio Padrão Móvel

@@ -6,7 +6,7 @@ from typing import Literal
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage
-from agentai.agents import create_pandas_agent, create_supervisor_agent, create_imputator_agent, create_imputator_agent
+from agentai.agents import create_pandas_agent, create_supervisor_agent, create_imputator_agent, create_summarizer_agent
 from agentai.modules.common import AgentState
 from agentai.tools import ImputationStrategyFactory
 
@@ -153,16 +153,23 @@ class WorkflowExecutor:
     
 
     def _summarizer_node(self, state:AgentState) -> dict:
-        summarizer_agent = create_imputator_agent()
+        summarizer_agent = create_summarizer_agent()
         
-        logs = state.get('logs')
-        summary = state.get('output')
+        logs = state.get('logs', [])
+        logs_to_summarize = "\n".join(logs)
+        prompt = f"summarize the following logs:\n{logs_to_summarize}"
 
-        # logs are to be summarized
-        response = summarizer_agent.invoke(logs)
-        logs.append("Summarizing complete.")
-        summary.append(response)
-        return
+        summary_text = ""
+        try:
+            response = summarizer_agent.invoke({"messages": [HumanMessage(content=prompt)]})
+            summary_text = str(response.get("messages", [])[-1].content)
+            logs.append("Finished summarizing.")
+        except Exception as e:
+            summary_text = f"ERRO: Falha ao invocar o agente de resumo: {e}"
+            logs.append("An error occurred whilst summarizing the logs")
+
+        return {"logs": logs, "summary": summary_text}
+    
         
             
 
@@ -175,7 +182,6 @@ class WorkflowExecutor:
         
         main_goal = state.get("main_goal", state.get('msg'))
         
-        # Contexto do supervisor agora em inglês
         input_message = (
             f"Main Goal: {main_goal}\n\n"
             f"The dataset has {len(self.df)} rows and {len(self.df.columns)} columns.\n"
@@ -224,21 +230,12 @@ class WorkflowExecutor:
         
         print("\n--- RESULTADO FINAL DO GRAFO ---")
         for key, value in final_state.items():
-            if key in ['subagents_report', 'next']:
+            if key in ['subagents_report', 'next', 'summary']:
                 continue
             print(f"  {key}: {value}")
+
+        summary = final_state.get("summary", "ERRO: Nenhum resumo foi gerado.")
+
+        print(f"\n\nRESUMO:\n {summary}")
+
         return final_state
-
-
-    # same as 'invoke' but better for debug (should be removed when we start using langsmith correctly)
-    def stream(self, initial_message: str, thread_id: str):
-        config = {"configurable": {"thread_id": thread_id}}
-        initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message}
-        
-        for event in self.graph.stream(initial_state, config=config):
-            #, recursion_limit=15
-            for key, value in event.items():
-                print(f"--- Evento do Nó: {key} ---")
-                print(value)
-                print("\n")
-

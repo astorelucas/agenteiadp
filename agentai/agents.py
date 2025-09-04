@@ -53,7 +53,7 @@ def create_supervisor_agent() -> AgentExecutor:
         1.  **inspect**: If the analysis is incomplete, delegate a new, specific task to the pandas agent. The task should be a logical next step towards the main goal.
         2.  **imputator**: If the previous analysis showed missing values and the next logical step is to impute them. You must delegate this to the imputation specialist.
         3.  **feature_engineer**: If the task is to create new columns or features (like rolling averages, lags, etc.), delegate this to the feature engineering node.
-        4.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete.
+        4.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
@@ -131,6 +131,9 @@ def create_summarizer_agent() -> AgentExecutor:
             Generate only the numbered list of summary points.
 
             Do not add any introductions, conclusions, or explanatory text. Your response must begin directly with 1..
+
+            *IMPORTANT*: Use the first-person point of view, as if you were the one doing those actions; Your summary must contain every important information, do not hesitate
+            to write any necessary information, even if it is a summary.
         """,
         tools=[]
     )

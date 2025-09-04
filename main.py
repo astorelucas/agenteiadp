@@ -29,24 +29,16 @@ def execute_pipeline():
         print(f"não foi possível gerar a imagem do grafo: {e}")
 
 
-    # unique id
+    # unique ID
     thread_id = str(uuid4())
 
-    
-    # initial prompt
-    initial_prompt = "Perform a complete exploratory data analysis on the quality of this dataset. Start with a general overview, then delve into the most important points you deem necessary, such as missing values, descriptive statistics, and potential outliers. Also create features. Provide a final summary upon completion."
-    # Luisas prompt:
-    # initial_prompt = """
-    # First, create a feature for the 3-hour rolling average of the 'temperature' column.
-    # Second, create another feature for the 3-hour rolling standard deviation of the 'temperature' column.
-    # Finally, provide a summary of the updated DataFrame, showing the first few rows to confirm that both new columns ('temperature_rolling_avg_3h' and 'temperature_rolling_std_3h') have been created correctly.
-    # """
+    initial_prompt = "Perform a complete exploratory data analysis on the quality of this dataset. Start with a general overview, then delve into the most important points you deem necessary, such as missing values, descriptive statistics, and potential outliers. Also create features."
 
     print("\n--- INICIANDO EXECUÇÃO DO GRAFO ---")
     executor.invoke(initial_message=initial_prompt, thread_id=thread_id)
     print("--- FIM DA EXECUÇÃO DO GRAFO ---\n")
-    print("\n--- DataFrame Final Após a Execução ---")
-    print(executor.df)
+    # print("\n--- DataFrame Final Após a Execução ---")
+    # print(executor.df)
 
 if __name__ == "__main__":
     execute_pipeline()

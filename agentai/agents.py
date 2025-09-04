@@ -53,7 +53,7 @@ def create_supervisor_agent() -> AgentExecutor:
         1.  **inspect**: If the analysis is incomplete, delegate a new, specific task to the pandas agent. The task should be a logical next step towards the main goal.
         2.  **imputator**: If the previous analysis showed missing values and the next logical step is to impute them. You must delegate this to the imputation specialist.
         3.  **feature_engineer**: If the task is to create new columns or features (like rolling averages, lags, etc.), delegate this to the feature engineering node.
-        4.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete.
+        4.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
@@ -107,6 +107,33 @@ def create_imputator_agent() -> AgentExecutor:
         
         Another valid response:
         {"method": "mice", "params": {"n_estimators": 10}}
+        """,
+        tools=[]
+    )
+
+
+def create_summarizer_agent() -> AgentExecutor:
+    """Creates the summarizer agent"""
+    return create_react_agent(
+        model=llm,
+        prompt=
+        """
+            You are a LogSummarizer agent. Your purpose is to distill complex, verbose logs into a clear and concise summary of significant events.
+            Analyze the provided logs and generate a chronological, numbered list summarizing the key actions and outcomes.
+
+            Rules:
+            1. Focus on Significance: Document events that mark progress, generate key artifacts, or represent critical failures.
+            2. Omit Transient Errors: Exclude self-corrected errors. If an agent fails a command but succeeds on the next attempt, only document the successful outcome.
+            3. Include Critical Failures: Report major errors that require intervention or a change in strategy. For example, a poorly performing ML model that an agent escalates to a supervisor MUST be included.
+            4. Be Factual and Concise: Distill each step into a brief statement, but retain all crucial context and data.
+
+            Output Format:
+            Generate only the numbered list of summary points.
+
+            Do not add any introductions, conclusions, or explanatory text. Your response must begin directly with 1..
+
+            *IMPORTANT*: Use the first-person point of view, as if you were the one doing those actions; Your summary must contain every important information, do not hesitate
+            to write any necessary information, even if it is a summary.
         """,
         tools=[]
     )

@@ -2,12 +2,11 @@ import pandas as pd
 import re
 import json
 from typing import Literal
-from uuid import uuid4
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage
-from agentai.agents import create_pandas_agent, create_supervisor_agent, create_imputator_agent
+from agentai.agents import create_pandas_agent, create_supervisor_agent, create_imputator_agent, create_summarizer_agent
 from agentai.modules.common import AgentState
 from agentai.tools import ImputationStrategyFactory
 
@@ -21,6 +20,36 @@ class WorkflowExecutor:
         
         self.factory = ImputationStrategyFactory()
         self.graph = self._build_graph()
+
+    def _build_graph(self):
+        workflow = StateGraph(AgentState)
+
+        workflow.add_node("supervisor", self._supervisor_node)
+        workflow.add_node("inspect", self._pandas_node)
+        workflow.add_node("feature_engineer", self._feature_engineering_node)
+        workflow.add_node("imputator", self._imputator_node)
+        workflow.add_node("summarizer", self._summarizer_node)
+        
+        workflow.set_entry_point("supervisor")
+
+        workflow.add_edge("inspect", "supervisor")
+        workflow.add_edge("feature_engineer", "supervisor") 
+        workflow.add_edge("imputator", "supervisor")
+        workflow.add_edge("summarizer", END)
+        
+        workflow.add_conditional_edges(
+            "supervisor",
+            self._should_continue,
+            {
+                "inspect": "inspect",
+                "imputator": "imputator",
+                "feature_engineer": "feature_engineer", 
+                "end": "summarizer",
+            },
+        )
+
+        memory = MemorySaver()
+        return workflow.compile(checkpointer=memory)
 
     def _feature_engineering_node(self, state: AgentState) -> dict:
         logs = state.get("logs", [])
@@ -54,35 +83,6 @@ class WorkflowExecutor:
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
 
-    def _build_graph(self):
-        workflow = StateGraph(AgentState)
-
-        workflow.add_node("supervisor", self._supervisor_node)
-        workflow.add_node("inspect", self._pandas_node)
-        workflow.add_node("feature_engineer", self._feature_engineering_node)
-        workflow.add_node("imputator", self._imputator_node)
-        
-        workflow.set_entry_point("supervisor")
-
-        workflow.add_edge("inspect", "supervisor")
-        workflow.add_edge("feature_engineer", "supervisor") 
-        workflow.add_edge("imputator", "supervisor")
-
-
-        
-        workflow.add_conditional_edges(
-            "supervisor",
-            self._should_continue,
-            {
-                "inspect": "inspect",
-                "imputator": "imputator",
-                "feature_engineer": "feature_engineer", 
-                "end": END,
-            },
-        )
-
-        memory = MemorySaver()
-        return workflow.compile(checkpointer=memory)
 
     def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer","end"]:
         next_decision = state.get("next", "").lower()
@@ -152,6 +152,29 @@ class WorkflowExecutor:
         return {"subagents_report": report, "logs": logs}
     
 
+    def _summarizer_node(self, state:AgentState) -> dict:
+        summarizer_agent = create_summarizer_agent()
+        
+        logs = state.get('logs', [])
+        logs_to_summarize = "\n".join(logs)
+        prompt = f"summarize the following logs:\n{logs_to_summarize}"
+
+        summary_text = ""
+        try:
+            response = summarizer_agent.invoke({"messages": [HumanMessage(content=prompt)]})
+            summary_text = str(response.get("messages", [])[-1].content)
+            logs.append("Finished summarizing.")
+        except Exception as e:
+            summary_text = f"ERRO: Falha ao invocar o agente de resumo: {e}"
+            logs.append("An error occurred whilst summarizing the logs")
+
+        return {"logs": logs, "summary": summary_text}
+    
+        
+            
+
+
+
     def _supervisor_node(self, state: AgentState) -> dict:
         supervisor_agent = create_supervisor_agent()
         
@@ -159,7 +182,6 @@ class WorkflowExecutor:
         
         main_goal = state.get("main_goal", state.get('msg'))
         
-        # Contexto do supervisor agora em inglês
         input_message = (
             f"Main Goal: {main_goal}\n\n"
             f"The dataset has {len(self.df)} rows and {len(self.df.columns)} columns.\n"
@@ -208,21 +230,12 @@ class WorkflowExecutor:
         
         print("\n--- RESULTADO FINAL DO GRAFO ---")
         for key, value in final_state.items():
-            if key in ['subagents_report', 'next']:
+            if key in ['subagents_report', 'next', 'summary']:
                 continue
             print(f"  {key}: {value}")
+
+        summary = final_state.get("summary", "ERRO: Nenhum resumo foi gerado.")
+
+        print(f"\n\nRESUMO:\n {summary}")
+
         return final_state
-
-
-    # same as 'invoke' but better for debug (should be removed when we start using langsmith correctly)
-    def stream(self, initial_message: str, thread_id: str):
-        config = {"configurable": {"thread_id": thread_id}}
-        initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message}
-        
-        for event in self.graph.stream(initial_state, config=config):
-            #, recursion_limit=15
-            for key, value in event.items():
-                print(f"--- Evento do Nó: {key} ---")
-                print(value)
-                print("\n")
-

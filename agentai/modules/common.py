@@ -7,8 +7,9 @@ from typing import TypedDict, Optional
 
 class AgentState(TypedDict):
     # persistent states
-    logs: list[str]
-    main_goal: str
+    logs: list[str]         # all agents logs
+    main_goal: str          # main goal of the run
+    summary: str            # final summary of our logs
 
     # ephemeral states
     msg: Optional[str]

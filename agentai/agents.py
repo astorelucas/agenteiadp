@@ -34,7 +34,8 @@ def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         - Use the available tools to perform the analysis.
         - Your final response MUST BE a clear report of your findings.
 
-        DO NOT CREATE PLOTS. Your only job is to analyze the data and report the results, along with possible plots based on the analysis.
+        DO NOT CREATE PLOTS. Your only job is to analyze the data and report the results.
+        IMPORTANT: In the report findings, ALWAYS include plot suggestions, but DO NOT create the plots yourself.
         """
     )
 
@@ -52,12 +53,14 @@ def create_supervisor_agent(llm) -> AgentExecutor:
 
         Based on the current state, decide what to do next. The possible actions are:
         1.  **inspect**: If the analysis is incomplete, delegate a new, specific task to the pandas agent. The task should be a logical next step towards the main goal.
-        2.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete.
+        2.  **plot**: If the inspection is done and you believe that visualizations will help in understanding the data better, delegate a task to the plotter agent.
+        3.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete.
 
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
-        - "next": The next action, which must be either "inspect" or "END".
-        - "msg": A clear and specific instruction for the next agent if the action is 'inspect'.
+        - "next": The next action, which must be either "inspect", "plot" or "END".
+        - "msg": A clear and specific instruction for the next agent if the action is 'inspect' or 'plot'.
+        - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. This is important for the plotter agent to know.
 
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
 
@@ -73,12 +76,12 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         tools=[]
     )
 
-def create_plotter_agent(df: pd.DataFrame, images_path: str, llm) -> AgentExecutor:
+def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: bool) -> AgentExecutor:
     """
     Creates the plotter agent
     """
 
-    plotting_tools = make_plot_tools(df, images_path)
+    plotting_tools = make_plot_tools(df, images_path, is_before_dp)
 
     # Create the ReAct agent
     return create_pandas_dataframe_agent(
@@ -101,7 +104,9 @@ def create_plotter_agent(df: pd.DataFrame, images_path: str, llm) -> AgentExecut
 
         MANDATORY RULES:
         - ALWAYS create a plot (or plots), never just textual analysis
-        - ALWAYS use the tools provided to create the plots
+        - ALWAYS just use the tools provided to create the plots
+        - ALWAYS check the tools description to understand how to use them
+        - NEVER try to create plots manually using matplotlib, seaborn, or any other library
 
         AVAILABLE TOOLS:
         - plot_time_series: Create a time series line plot for one or more numeric columns over time.
@@ -111,5 +116,6 @@ def create_plotter_agent(df: pd.DataFrame, images_path: str, llm) -> AgentExecut
 
         IMPORTANT: You are working with a DataFrame that is ALREADY loaded into a variable named `df`.
         DO NOT try to redefine or recreate this `df` variable.
+
         """    
     )

@@ -14,3 +14,4 @@ class AgentState(TypedDict):
     msg: Optional[str]
     subagents_report: Optional[str]
     next: Optional[str]
+    is_before_dp: Optional[bool]

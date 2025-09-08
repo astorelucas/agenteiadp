@@ -39,6 +39,7 @@ class WorkflowExecutor:
             self._should_continue,
             {
                 "inspect": "inspect",
+                "plot": "plot",
                 "end": END,
             },
         )
@@ -47,8 +48,9 @@ class WorkflowExecutor:
         return workflow.compile(checkpointer=memory)
 
     def _should_continue(self, state: AgentState) -> Literal["inspect", "end"]:
-        if state.get("next", "").lower() == "inspect":
-            return "inspect"
+        next_decision = state.get("next", "").lower()
+        if  next_decision in ["inspect", "plot"]:
+            return next_decision
         else:
             return "end"
 
@@ -112,9 +114,14 @@ class WorkflowExecutor:
             logs.append(f"Supervisor produced invalid JSON. Output: {json_str_match.group(0)}")
             return {"next": "END", "logs": logs}
         
+        print("--- Supervisor Agent Output ---")
+        print(plan)
+        print("-------------------------------")
         next_step = plan.get("next", "END")
         msg_out = plan.get("msg", state.get("msg"))
         output = plan.get("output", "")
+        is_before_dp = plan.get("is_before_dp", True)
+
         # Log de decisão em inglês
         logs.append(f"Supervisor decision: {output}")
         
@@ -123,16 +130,24 @@ class WorkflowExecutor:
             "msg": msg_out, 
             "logs": logs, 
             "subagents_report": None,
-            "main_goal": main_goal 
+            "main_goal": main_goal, 
+            "is_before_dp": is_before_dp
         }
     
     def _plotter_node(self, state: AgentState) -> dict:
         msg = state.get("msg", "").lower()
         logs = state.get("logs", [])
+        is_before_dp = state.get('is_before_dp')
+
+        input_message = (
+            f"Create plots to help analyze the dataset based on the following instruction: '{msg}'.\n"
+            f"If the instruction is not clear, create simple plots like scatter, time series, heatmap and histogram.\n"
+        )
         
         try:
-            agent = create_plotter_agent(self.df, self.images_path, self.llm)
-            response = agent.invoke({"input": "Create some plots to help with the analysis (ts, heatmap, hist, scatter). "})
+            print("--- Invoking Time Series Agent ---")
+            agent = create_plotter_agent(self.df, self.images_path, self.llm, is_before_dp=is_before_dp)
+            response = agent.invoke({"input": input_message})
             print("--- Response from Time Series Agent ---")
             print(response)
             timeseries_report = response.get("output", "") or str(response)
@@ -145,7 +160,7 @@ class WorkflowExecutor:
     def invoke(self, initial_message: str, thread_id: str):
         """Executa o grafo e imprime apenas o resultado final."""
         config = {"configurable": {"thread_id": thread_id}}
-        initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message}
+        initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message, "is_before_dp": True}
      
         final_state = self.graph.invoke(initial_state, config=config, recursion_limit=15)
         

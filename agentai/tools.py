@@ -256,9 +256,15 @@ def inspect_data(df: str) -> Dict:
 #     except Exception as e:
 #         return f"Error saving file: {str(e)}"
     
-def make_plot_tools(df: pd.DataFrame, images_path: str) -> List:
+def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> List:
     """ Create plotting tools with the given DataFrame
     """
+    
+    # Ajustar o caminho das imagens com base no estado de pré-processamento
+    if is_before_dp:
+        images_path = images_path + "/before_dp"
+    else:
+        images_path = images_path + "/after_dp"
     
     # Confirmar que o diretório de imagens existe
     if not os.path.exists(images_path):
@@ -270,8 +276,7 @@ def make_plot_tools(df: pd.DataFrame, images_path: str) -> List:
         Plot time series line plot for specified columns with individual subplots.
         If 'cols_str' is None, plots all numeric columns.
         Args:
-            cols_str: List of column names to plot (str). If None, plots all numeric columns.
-            is_before_dp: Flag indicating if the data is before data processing (bool).
+            cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
         Returns:
             dict: Success message or error details
         """
@@ -371,7 +376,7 @@ def make_plot_tools(df: pd.DataFrame, images_path: str) -> List:
         Create an enhanced scatter plot between two specified columns.
 
         Args:
-            two_cols_str: Comma-separated string of two column names to plot (str).
+            two_cols_str: Comma-separated string of two column names to plot (str). Example: "col1,col2,col3"
 
         Returns:
             dict: Success message or error details
@@ -412,9 +417,8 @@ def make_plot_tools(df: pd.DataFrame, images_path: str) -> List:
         Create individual histograms for specified columns.
 
         Args:
-            cols_str: List of column names to plot (str). If None, plots all numeric columns.
+            cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
             bins: Number of bins for the histograms (int).
-            is_before_dp: Flag indicating if the data is before data processing (bool).
 
         If 'cols' is None, plot all numeric columns.
         """
@@ -472,7 +476,77 @@ def make_plot_tools(df: pd.DataFrame, images_path: str) -> List:
         except Exception as e:  
             return {"error": str(e)}
         
-    return [plot_time_series, plot_scatter, plot_histograms, plot_heatmap]
+    @tool
+    def plot_boxplot(cols_str: str = None):
+        """
+        Create boxplots for specified columns.
+
+        Args:
+            cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
+
+        If 'cols' is None, plot all numeric columns.
+        """
+        try:
+
+            cols = cols_str.split(",") if cols_str else None
+            if cols is None:
+                cols = df.select_dtypes(include="number").columns.tolist()
+
+            n_cols = 2  # número de colunas no grid de subplots
+            n_rows = (len(cols) + 1) // n_cols
+
+            plt.figure(figsize=(6 * n_cols, 4 * n_rows))
+
+            # Criar subplots
+            for idx, col in enumerate(cols, 1):
+                plt.subplot(n_rows, n_cols, idx)
+                sns.boxplot(y=df[col], color="lightgreen")
+
+                plt.title(f"{col}", fontsize=14)
+                plt.ylabel(col, fontsize=12)
+                plt.grid(True, linestyle="--", alpha=0.6)
+
+            plt.suptitle("Boxplots of numerical variables", fontsize=16, y=1.02)
+            plt.tight_layout()
+            plt.savefig(f"{images_path}/boxplots.png")
+            plt.close()
+
+            return {"msg": "Boxplots created successfully."}
+
+        except Exception as e:
+            return {"error": str(e)}
+        
+    @tool
+    def plot_scatter_matrix(cols_str: str = None):
+        """
+        Create a scatter matrix (pair plot) for specified columns.
+
+        Args:
+            cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
+
+        If 'cols' is None, plot all numeric columns.
+        """
+        try:
+
+            cols = cols_str.split(",") if cols_str else None
+            if cols is None:
+                cols = df.select_dtypes(include="number").columns.tolist()
+
+            if len(cols) < 2:
+                return {"error": "At least two numeric columns are required for scatter matrix."}
+
+            sns.pairplot(df[cols], diag_kind="kde", plot_kws={"alpha": 0.5})
+            plt.suptitle("Scatter Matrix (Pair Plot)", fontsize=16, y=1.02)
+            plt.tight_layout()
+            plt.savefig(f"{images_path}/scatter_matrix.png")
+            plt.close()
+
+            return {"msg": "Scatter matrix created successfully."}
+
+        except Exception as e:
+            return {"error": str(e)}
+        
+    return [plot_time_series, plot_scatter, plot_histograms, plot_heatmap, plot_boxplot, plot_scatter_matrix]
 
 inspection_tools = [inspect_data]
 # cleaning_tools = [clean_data]

@@ -11,7 +11,6 @@ from langchain_experimental.agents import create_pandas_dataframe_agent
 from agentai.tools import inspection_tools
 
 os.environ["DEEPINFRA_API_KEY"] = getpass("Enter your key: ")
-# llm = ChatDeepInfra(model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8")
 
 llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct")
 
@@ -137,3 +136,18 @@ def create_summarizer_agent() -> AgentExecutor:
         """,
         tools=[]
     )
+
+# MAYBE WON'T NEED A NEW AGENT
+# FIRST I will try to use as just a simple node
+# POSSIBLE PROBLEM: supervisor getting confused when passing the problem to search in this node
+
+# def create_retriever_agent() -> AgentExecutor:
+#     """Creates the retriever agent"""
+#     return create_react_agent(
+#         model=llm,
+#         prompt=
+#         """
+#             You are a retriever agent. You mu
+#         """,
+#         tools=retriever_tools
+#     )

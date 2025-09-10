@@ -7,7 +7,7 @@ from agentai.modules.common import AgentState
 from agentai.agents import (
     create_pandas_agent,
     create_supervisor_agent,
-    create_imputator_agent,
+    create_imputator_agent
 )
 
 
@@ -197,3 +197,34 @@ class SupervisorNode(Node):
             "subagents_report": None,
             "main_goal": main_goal,
         }
+
+
+class RetrieverNode(Node):
+    def __init__(self, executor):
+        super().__init__("retriever")
+        self.executor = executor
+
+    def execute(self, state: AgentState) -> dict:
+        logs = state.get("logs", [])
+        msg = state.get("msg", "")
+        df = getattr(self.executor, "df", None)
+
+        if df is None:
+            error_report = "RetrieverNode: no DataFrame available."
+            logs.append(error_report)
+            return {"subagents_report": error_report, "logs": logs}
+
+        try:
+            # MUST CREATE RAG HERE.
+            report = ...
+            log_report = "[Retriever Node]" + report
+
+            # Persist changes back to the executor
+            self.executor.df = df
+            logs.append(report)
+            return {"subagents_report": report, "logs": logs}
+
+        except Exception as e:
+            error_report = f"Error in feature engineering node: {e}"
+            logs.append(error_report)
+            return {"subagents_report": error_report, "logs": logs}

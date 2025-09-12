@@ -1,12 +1,10 @@
 import pandas as pd
-import re
-import json
 from typing import Literal
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage
-from agentai.agents import create_pandas_agent, create_supervisor_agent, create_imputator_agent, create_summarizer_agent
+from agentai.agents import create_summarizer_agent
 from agentai.modules.common import AgentState
 from agentai.tools import ImputationStrategyFactory
 from agentai.nodes import (
@@ -14,11 +12,12 @@ from agentai.nodes import (
     PandasNode,
     ImputatorNode,
     SupervisorNode,
+    RetrieverNode
 )
 
 
 class WorkflowExecutor:
-    def __init__(self, csv_path: str):
+    def __init__(self, csv_path: str, ):
         try:
             self.df = pd.read_csv(csv_path)
         except Exception as e:
@@ -40,6 +39,7 @@ class WorkflowExecutor:
         workflow.add_node("inspect", inspect_node.execute)
         workflow.add_node("feature_engineer", feature_engineer_node.execute)
         workflow.add_node("imputator", imputator_node.execute)
+        workflow.add_node("retriever", RetrieverNode.execute)
         workflow.add_node("summarizer", self._summarizer_node)
         
         workflow.set_entry_point("supervisor")
@@ -47,6 +47,7 @@ class WorkflowExecutor:
         workflow.add_edge("inspect", "supervisor")
         workflow.add_edge("feature_engineer", "supervisor") 
         workflow.add_edge("imputator", "supervisor")
+        workflow.add_edge("retriever", "supervisor")
         workflow.add_edge("summarizer", END)
         
         workflow.add_conditional_edges(
@@ -56,6 +57,7 @@ class WorkflowExecutor:
                 "inspect": "inspect",
                 "imputator": "imputator",
                 "feature_engineer": "feature_engineer", 
+                "retriever": "retriever",
                 "end": "summarizer",
             },
         )
@@ -63,9 +65,9 @@ class WorkflowExecutor:
         memory = MemorySaver()
         return workflow.compile(checkpointer=memory)
 
-    def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer","end"]:
+    def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer", "retriever", "end"]:
         next_decision = state.get("next", "").lower()
-        if  next_decision in ["inspect", "imputator", "feature_engineer"]:
+        if  next_decision in ["inspect", "imputator", "feature_engineer", "retriever"]:
             return next_decision
         else:
             return "end"

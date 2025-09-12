@@ -23,3 +23,4 @@ pyppeteer
 matplotlib
 seaborn
 streamlit
+chromadb

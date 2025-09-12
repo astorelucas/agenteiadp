@@ -1,8 +1,7 @@
 import os
 from getpass import getpass
+from dotenv import load_dotenv
 import pandas as pd
-import matplotlib
-import seaborn
 from sklearn.experimental import enable_iterative_imputer
 from langchain.agents import AgentExecutor
 from langchain_community.chat_models import ChatDeepInfra
@@ -10,11 +9,11 @@ from langgraph.prebuilt import create_react_agent
 from langchain_experimental.agents import create_pandas_dataframe_agent
 from agentai.tools import inspection_tools
 
-os.environ["DEEPINFRA_API_KEY"] = getpass("Enter your key: ")
+# DEEPINFRA_API_KEY = os.getenv("DEEPINFRA_API_KEY")
 
+# os.environ["DEEPINFRA_API_KEY"] = getpass("Enter your key: ")
+load_dotenv()
 llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct")
-
-
 
 # create_supervisor_agent: '{' instead of '{{', because its not fstring, just a normal string
 # create_pandas_agent: if needed, use '{{' instead of '{', as it uses a fstring internally (????????????????????)
@@ -136,18 +135,3 @@ def create_summarizer_agent() -> AgentExecutor:
         """,
         tools=[]
     )
-
-# MAYBE WON'T NEED A NEW AGENT
-# FIRST I will try to use as just a simple node
-# POSSIBLE PROBLEM: supervisor getting confused when passing the problem to search in this node
-
-# def create_retriever_agent() -> AgentExecutor:
-#     """Creates the retriever agent"""
-#     return create_react_agent(
-#         model=llm,
-#         prompt=
-#         """
-#             You are a retriever agent. You mu
-#         """,
-#         tools=retriever_tools
-#     )

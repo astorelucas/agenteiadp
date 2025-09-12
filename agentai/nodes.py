@@ -1,14 +1,15 @@
-from typing import Any, Dict
 import json
 import re
 
 from langchain_core.messages import HumanMessage
 from agentai.modules.common import AgentState
+from agentai.rag import RAG
 from agentai.agents import (
     create_pandas_agent,
     create_supervisor_agent,
     create_imputator_agent
 )
+
 
 
 class Node:
@@ -200,31 +201,21 @@ class SupervisorNode(Node):
 
 
 class RetrieverNode(Node):
-    def __init__(self, executor):
+    def __init__(self):
         super().__init__("retriever")
-        self.executor = executor
+        self.rag = RAG()
 
     def execute(self, state: AgentState) -> dict:
         logs = state.get("logs", [])
         msg = state.get("msg", "")
-        df = getattr(self.executor, "df", None)
-
-        if df is None:
-            error_report = "RetrieverNode: no DataFrame available."
-            logs.append(error_report)
-            return {"subagents_report": error_report, "logs": logs}
 
         try:
-            # MUST CREATE RAG HERE.
-            report = ...
-            log_report = "[Retriever Node]" + report
+            report = self.rag.retrieve(msg)
 
-            # Persist changes back to the executor
-            self.executor.df = df
-            logs.append(report)
+            logs.append("\n[Retriever Node]: " + report)
             return {"subagents_report": report, "logs": logs}
 
         except Exception as e:
-            error_report = f"Error in feature engineering node: {e}"
+            error_report = f"[Retriever Node]: Error: {e}"
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}

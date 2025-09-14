@@ -8,6 +8,7 @@ from agentai.agents import (
     create_pandas_agent,
     create_supervisor_agent,
     create_imputator_agent,
+    create_plotter_agent
 )
 
 
@@ -86,7 +87,7 @@ class PandasNode(Node):
         logs = state.get("logs", [])
         max_retries = 2
 
-        agent = create_pandas_agent(self.executor.df)
+        agent = create_pandas_agent(self.executor.df, self.executor.llm)
         current_input = msg
         inspection_report = ""
 
@@ -117,7 +118,7 @@ class ImputatorNode(Node):
         logs = state.get("logs", [])
         logs.append("Executing imputation node.")
 
-        imputator_agent = create_imputator_agent()
+        imputator_agent = create_imputator_agent(self.executor.llm)
         response = imputator_agent.invoke({"messages": [HumanMessage(content=context)]})
 
         raw_output = str(response.get("messages", [])[-1].content)
@@ -154,7 +155,7 @@ class SupervisorNode(Node):
         self.executor = executor
 
     def execute(self, state: AgentState) -> dict:
-        supervisor_agent = create_supervisor_agent()
+        supervisor_agent = create_supervisor_agent(self.executor.llm)
 
         previous_report = state.get("subagents_report")
 
@@ -188,12 +189,40 @@ class SupervisorNode(Node):
         next_step = plan.get("next", "END")
         msg_out = plan.get("msg", state.get("msg"))
         output = plan.get("output", "")
+        is_before_dp = plan.get("is_before_dp").lower() == "true"
         logs.append(f"Supervisor decision: {output}")
-
+        
         return {
-            "next": next_step,
-            "msg": msg_out,
-            "logs": logs,
+            "next": next_step, 
+            "msg": msg_out, 
+            "logs": logs, 
             "subagents_report": None,
-            "main_goal": main_goal,
+            "main_goal": main_goal, 
+            "is_before_dp": is_before_dp
         }
+    
+class PlotterNode(Node):
+    def __init__(self, executor):
+        super().__init__("plot")
+        self.executor = executor
+
+    def execute(self, state: AgentState) -> dict:
+        msg = state.get("msg", "").lower()
+        logs = state.get("logs", [])
+        is_before_dp = state.get('is_before_dp')
+
+        input_message = (
+            f"Create plots to help analyze the dataset based on the following instruction: '{msg}'.\n"
+            f"If the instruction is not clear, create simple plots like scatter, time series, heatmap and histogram.\n"
+        )
+        
+        try:
+            agent = create_plotter_agent(self.executor.df, self.executor.images_path, self.executor.llm, is_before_dp=is_before_dp)
+            response = agent.invoke({"input": input_message})
+            plotter_report = response.get("output", "") or str(response)
+            logs.append(f"Time series agent successfully executed instruction: '{msg}'")
+        except Exception as e:
+            plotter_report = f"Time series agent failed to execute instruction '{msg}'. Error: {e}"
+            logs.append(plotter_report)
+        
+        return {"subagents_report": plotter_report, "logs": logs}

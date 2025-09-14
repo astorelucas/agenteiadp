@@ -1,0 +1,90 @@
+## Guide for Agent Troubleshooting and Strategy v2.0
+
+This document contains solutions and strategic advice for common problems encountered during Exploratory Data Analysis (EDA) and automated machine learning (AutoML). Use this knowledge to resolve errors, overcome loops, and decide on the next best action.
+
+---
+
+### Section 1: General Strategy and EDA Guidance
+
+**Guideline: Standard EDA Workflow**
+If you are unsure about the next step, follow this general sequence:
+1.  **Initial Overview**: Get a high-level summary. Use the `inspect` node to run `df.info()`, `df.describe()`, and `df.isnull().sum()`. This is the most crucial first step.
+2.  **Handle Missing Data**: If the overview shows missing values, call the `imputator` node. Provide context about the data (e.g., "time-series sensor data").
+3.  **Feature Engineering**: Once the data is clean, consider creating new features. Call the `feature_engineer` node with a specific goal (e.g., "create a 3-hour rolling average for 'temperature'").
+4.  **Deeper Analysis**: If the initial steps are complete, proceed to deeper analysis.
+5.  **Termination**: When all goals are met, use `END`.
+
+**Guideline: What to do when you are stuck or the next step is unclear**
+If the basic EDA is done, but more analysis is needed, consider these actions for the `inspect` node:
+* **Check Correlations**: Instruct the `inspect` node to "generate a correlation matrix for all numeric columns using `df.corr()`". High correlations are useful for feature selection.
+* **Visualize Data**: Ask the `inspect` node to "plot a histogram of the 'pressure' column" or "create a scatter plot between 'temperature' and 'humidity'". Visualizations can reveal outliers, distributions, and relationships.
+* **Review the Main Goal**: Re-read the user's main objective to ensure all requirements have been addressed.
+
+---
+
+### Section 2: Node-Specific Troubleshooting
+
+**General Rule: Breaking Loops**
+* **Problem**: You are in a loop with a node (e.g., `feature_engineer` fails, and you call it again with the same instruction).
+* **Solution**: **Do not retry with the exact same instruction.** Change the strategy. The most reliable way to break a loop is to use the `inspect` node to perform the action that the failing node could not.
+
+**Node: `feature_engineer`**
+* **Problem**: The `feature_engineer` node returns an error or fails to create the columns.
+* **Solution**: This node can be rigid. The best alternative is to delegate the task to the `inspect` node, which is more flexible. For example: "Use the inspect node to create a new column named 'pressure_lag_1' which is the value of the 'pressure' column from the previous row."
+
+**Node: `inspect`**
+* **Problem**: The `inspect` node fails repeatedly with a `KeyError` or `AttributeError`.
+* **Solution**: The instruction is likely using a wrong column or method name. Formulate a new instruction to diagnose the problem first. For example: "List the columns of the dataframe `df` using `df.columns`" before trying to access a column you are unsure about.
+
+**Node: `imputator`**
+* **Problem**: The `imputator` node fails.
+* **Solution**: Imputation often fails on non-numeric data. Use the `inspect` node to check the data types of the columns with missing values using `df.info()`. Ensure they are numeric before calling the `imputator` again.
+
+---
+
+### Section 3: Handling Poor Model Performance (for AutoML node)
+
+**General Guideline for the future `automl` node**
+If the `automl` node trains a model but reports poor performance (e.g., low accuracy, high error), use the retriever to find guidance here.
+
+**Problem: Model performance is low (Underfitting)**
+* **Symptom**: Both training and validation accuracy are low. The model is too simple to capture the data's patterns.
+* **Solution 1 (Better Features)**: The most effective solution is to create better features. Call the `feature_engineer` node with instructions to create interaction features (e.g., `col1 * col2`) or polynomial features (`col1^2`).
+* **Solution 2 (Check Data Quality)**: Use the `inspect` node to check for outliers or strange distributions in key features. Poor data quality leads to poor models.
+
+**Problem: Model is not generalizing (Overfitting)**
+* **Symptom**: Training accuracy is very high, but validation accuracy is much lower. The model memorized the training data but can't predict new data.
+* **Solution 1 (Simpler Features)**: If you recently created many complex features, they might be causing overfitting. Try removing them.
+* **Solution 2 (Delegate to AutoML)**: A good AutoML tool should have parameters to control for overfitting (e.g., regularization). This problem is best solved by the tool itself, but if it fails, better feature engineering is the next best step.
+
+---
+
+### Section 4: Common Pandas Errors and Solutions
+
+**Problem: `KeyError: '[column name]'`**
+* **Symptom**: You tried to access a column that does not exist.
+* **Solution**: Verify column names with `df.columns`.
+
+**Problem: `AttributeError: 'DataFrame' object has no attribute '[method_name]'`**
+* **Symptom**: You called a method that doesn't exist.
+* **Solution**: Check the pandas documentation for the correct method name (e.g., `df.describe()` not `df.describe_data()`).
+
+**Problem: Unexpected `NaN` results**
+* **Symptom**: A calculation results in all `NaN`s, or a plot looks strange.
+* **Solution**: This is often caused by non-numeric data in a numeric column or by infinity values. Use `df.info()` to check data types and replace infinities if necessary: `df.replace([np.inf, -np.inf], np.nan, inplace=True)`.
+
+---
+
+### Section 5: Imputation Method Selection Advice
+
+**When to use 'knn' (K-Nearest Neighbors):**
+- **Best for**: Datasets where data points that are "close" to each other are similar. Excellent for sensor data or spatial data. It's computationally faster than MICE or GP.
+- **Weakness**: Can be skewed by outliers. Assumes data is Missing at Random (MAR) or Missing Completely at Random (MCAR).
+
+**When to use 'mice' (Multivariate Imputation by Chained Equations):**
+- **Best for**: Datasets where the variables are correlated with each other in complex ways (e.g., user demographic data where age, income, and credit score are related). It is very robust.
+- **Weakness**: It's an iterative process and can be slower than KNN, especially with a high number of estimators.
+
+**When to use 'gp' (Gaussian Process):**
+- **Best for**: Time-series data where you want a sophisticated interpolation that also provides an uncertainty estimate.
+- **CRITICAL CAVEAT**: The GP implementation requires at least **two numeric columns** to function (one for features, one for the target). It is also computationally very expensive and should only be used on smaller datasets. If the dataset has only one numeric column with missing values, GP will fail.

@@ -13,7 +13,7 @@ API_KEY = os.getenv("DEEPINFRA_API_KEY")
 
 
 class RAG():
-    def __init__(self, persist_directory="./memoryDB", document="teste_rag"):
+    def __init__(self, persist_directory="./memoryDB", document="./agentai/teste_rag.txt"):
         self.document = document # I think it won't be needed in the future
         self.persist_directory = persist_directory
         self.collection_name = "long-term-memory"
@@ -33,7 +33,7 @@ class RAG():
         docs = loader.load()
         
         # create chunks
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=50)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
         doc_splits = text_splitter.split_documents(docs)
         
         # using vectorStore Chroma
@@ -56,12 +56,43 @@ class RAG():
 
 
     def store(self, texts: list[str]):
-        splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=50)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
         document_chunks = splitter.create_documents(texts)
         self.vectorstore.add_documents(documents=document_chunks)
 
 
     def retrieve(self, query: str):
-        results = self.retriever.invoke(query)
-        return "\n".join([doc.page_content for doc in results])
+        print(f"\n\n RAG EXECUTED WITH QUERY: '{query}'\n")
+
+        query_splitter = RecursiveCharacterTextSplitter(chunk_size=30, chunk_overlap=20)
+        query_chunks = query_splitter.split_text(query)
+        
+        print(f"Query broken into chunks for searching: {query_chunks}")
+
+        all_results = []
+        for chunk in query_chunks:
+            results = self.retriever.invoke(chunk)
+            all_results.extend(results)
+
+        unique_results_dict = {doc.page_content: doc for doc in all_results}
+        unique_results = list(unique_results_dict.values())
+
+        if not unique_results:
+            print("No results found in RAG.\n\n")
+            return "No relevant solution was found in the knowledge base. Please proceed with an alternative strategy."
+
+        print(f"RAG Results Found: {[doc.page_content for doc in unique_results]} \n\n")
+        return "\n".join([doc.page_content for doc in unique_results])
+    
+    # def retrieve(self, query: str):
+    #     print("\n\n RAG EXECUTED \n")
+    #     results = self.retriever.invoke(query)
+        
+    #     # Verifica se a lista de resultados está vazia
+    #     if not results:
+    #         print("No results found in RAG.\n\n")
+    #         return "No relevant solution was found in the knowledge base. Please proceed with an alternative strategy."
+
+    #     print(f"RAG Results: {results} \n\n")
+    #     return "\n".join([doc.page_content for doc in results])
     

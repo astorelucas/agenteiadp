@@ -33,13 +33,14 @@ class WorkflowExecutor:
         inspect_node = PandasNode(self)
         feature_engineer_node = FeatureEngineeringNode(self)
         imputator_node = ImputatorNode(self)
+        retriever_node = RetrieverNode()
 
         # register nodes using their execute methods
         workflow.add_node("supervisor", supervisor_node.execute)
         workflow.add_node("inspect", inspect_node.execute)
         workflow.add_node("feature_engineer", feature_engineer_node.execute)
         workflow.add_node("imputator", imputator_node.execute)
-        workflow.add_node("retriever", RetrieverNode.execute)
+        workflow.add_node("retriever", retriever_node.execute)
         workflow.add_node("summarizer", self._summarizer_node)
         
         workflow.set_entry_point("supervisor")
@@ -84,31 +85,44 @@ class WorkflowExecutor:
         try:
             response = summarizer_agent.invoke({"messages": [HumanMessage(content=prompt)]})
             summary_text = str(response.get("messages", [])[-1].content)
-            logs.append("Finished summarizing.")
+            logs.append("\n[Summarizer Node] Finished summarizing.")
         except Exception as e:
             summary_text = f"ERRO: Falha ao invocar o agente de resumo: {e}"
-            logs.append("An error occurred whilst summarizing the logs")
+            logs.append("\n[Summarizer Node] An error occurred whilst summarizing the logs")
 
         return {"logs": logs, "summary": summary_text}
     
-
     def invoke(self, initial_message: str, thread_id: str):
-        """Executa o grafo e imprime apenas o resultado final."""
+        """Executa o grafo e imprime o progresso de cada nó, garantindo que todos os relatórios sejam exibidos."""
         config = {"configurable": {"thread_id": thread_id}}
         initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message}
-     
-        final_state = self.graph.invoke(initial_state, config=config)
-        #, recursion_limit=15
+
+        final_state = {}
         
-        print("\n--- RESULTADO FINAL DO GRAFO ---")
-        for key, value in final_state.items():
-            if key in ['subagents_report', 'next', 'summary']:
-                continue
-            print(f"  {key}: {value}")
+        print("\n--- INICIANDO EXECUÇÃO DO GRAFO ---")
+        for chunk in self.graph.stream(initial_state, config=config, recursion_limit=30):
+            for node_name, state in chunk.items():
+                print(f"\n--- [ Nó Executado: {node_name} ] ---")
+                
+                if report := state.get("subagents_report"):
+                    print("Relatório:")
+                    print(report)
+                    if node_name == "supervisor":
+                        print("-" * 25)
 
+                if node_name == "supervisor":
+                    print(f"Próximo passo planejado: '{state.get('next')}'")
+                    print(f"Instrução para o próximo agente: \"{state.get('msg')}\"")
+                
+                elif node_name == "summarizer":
+                    print("Execução concluída. Gerando resumo...")
+
+            if chunk:
+                final_state = list(chunk.values())[0]
+
+        print("\n\n--- FIM DA EXECUÇÃO DO GRAFO ---")
+        
         summary = final_state.get("summary", "ERRO: Nenhum resumo foi gerado.")
-
-        print(f"\n\nRESUMO:\n {summary}")
+        print(f"\nRESUMO:\n{summary}")
 
         return final_state
-

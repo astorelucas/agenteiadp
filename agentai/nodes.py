@@ -25,7 +25,7 @@ class Node:
             return self.execute(state)
         except Exception as e:
             logs = state.get("logs", [])
-            logs.append(f"Node '{self.name}' error: {e}")
+            logs.append(f"[Node '{self.name}]' error: {e}")
             return {"subagents_report": f"Error in node '{self.name}': {e}", "logs": logs}
 
     def __call__(self, state: AgentState) -> dict:
@@ -43,27 +43,27 @@ class FeatureEngineeringNode(Node):
         df = getattr(self.executor, "df", None)
 
         if df is None:
-            error_report = "FeatureEngineeringNode: no DataFrame available on executor."
+            error_report = "\n[FeatureEngineeringNode] no DataFrame available on executor."
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
 
         try:
             # Rolling average for 'temperature'
             if "rolling average" in msg and "temperature" in msg:
-                logs.append("Executing: Create rolling average for temperature.")
+                logs.append("\n[FeatureEngineeringNode] Executing: Create rolling average for temperature.")
                 new_col = 'temperature_rolling_avg_3h'
                 df[new_col] = df['temperature'].rolling(window=3, min_periods=1).mean().fillna(method="bfill")
                 report = f"Successfully created column: {new_col}"
 
             # Rolling standard deviation for 'temperature'
             elif "standard deviation" in msg and "temperature" in msg:
-                logs.append("Executing: Create rolling standard deviation for temperature.")
+                logs.append("\n[FeatureEngineeringNode] Executing: Create rolling standard deviation for temperature.")
                 new_col = 'temperature_rolling_std_3h'
                 df[new_col] = df['temperature'].rolling(window=3, min_periods=1).std().fillna(0)
                 report = f"Successfully created column: {new_col}"
 
             else:
-                report = "No specific feature engineering task found in the instruction."
+                report = "ERROR: No specific feature engineering task found in the instruction."
 
             # Persist changes back to the executor
             self.executor.df = df
@@ -116,7 +116,7 @@ class ImputatorNode(Node):
     def execute(self, state: AgentState) -> dict:
         context = state.get("msg", "")
         logs = state.get("logs", [])
-        logs.append("Executing imputation node.")
+        logs.append("\n[Imputator Node] Executing imputation node.")
 
         imputator_agent = create_imputator_agent()
         response = imputator_agent.invoke({"messages": [HumanMessage(content=context)]})
@@ -211,7 +211,6 @@ class RetrieverNode(Node):
 
         try:
             report = self.rag.retrieve(msg)
-
             logs.append("\n[Retriever Node]: " + report)
             return {"subagents_report": report, "logs": logs}
 

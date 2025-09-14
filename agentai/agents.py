@@ -32,6 +32,7 @@ def create_pandas_agent(df: pd.DataFrame) -> AgentExecutor:
         IMPORTANT: You are working with a DataFrame that is ALREADY loaded into a variable named `df`.
         DO NOT try to redefine or recreate this `df` variable.
         Directly apply your pandas commands to the `df` variable, for example: `df.describe()`.
+        Always import the  
         """
     )
 
@@ -51,15 +52,20 @@ def create_supervisor_agent() -> AgentExecutor:
         1.  **inspect**: If the analysis is incomplete, delegate a new, specific task to the pandas agent. The task should be a logical next step towards the main goal.
         2.  **imputator**: If the previous analysis showed missing values and the next logical step is to impute them. You must delegate this to the imputation specialist.
         3.  **feature_engineer**: If the task is to create new columns or features (like rolling averages, lags, etc.), delegate this to the feature engineering node.
-        4.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
+        4. **retriever**: To solve problems (like code errors, bad results) or for strategic guidance, you must use the retriever to consult past experiences.
+        5.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
-        - "next": The next action, which must be either "inspect", "imputator" or "END".
+        - "next": The next action, which must be either "inspect", "imputator", "feature_engineer", "retriever" or "END".
         - "msg": A clear and specific instruction for the next agent. For 'imputator', this should be a descriptive context of the dataset for it to make a decision.
 
 
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
+        IMPORTANT: If the 'Report from the previous step' contains an ERROR or indicates a FAILURE or if you see that it is in a LOOP, you MUST prioritize using the 'retriever' node to find a solution. DO NOT repeat the same failed instruction.
+        When using the 'retriever', the 'msg' field should be a clear of your problem or doubt. Formulate it as a search query for a RAG. It must cointain where it happened, which node etc. Do not be specific with your problem.
+
+
 
         Example 1 (Starting):
         {"output": "The analysis has just started. I will begin by getting an overview of the dataset.", "next": "inspect", "msg": "Summarize the dataset, checking for missing values and data types."}
@@ -67,7 +73,13 @@ def create_supervisor_agent() -> AgentExecutor:
         Example 2 (Delegating Imputation):
         {"output": "The inspection revealed missing data in several columns. I will now delegate the task of choosing the best imputation method to the specialist.", "next": "imputator", "msg": "The initial analysis found missing values in the following columns: ['temperature', 'pressure']. The data appears to be time-series sensor data."}
 
-        Example 3 (Ending):
+        Example 3 (Using the Retriever Correctly):
+        {"output": "The feature_engineer node failed. I will search the knowledge base for a solution.", "next": "retriever", "msg": "error in feature_engineer node"}
+
+        Example 4 (Using the Retriever Correctly again):
+        {"output": "The inspect node raised an error. I will search the knowledge base for a solution.", "next": "retriever", "msg": "recursion limit error in inspect node"}
+
+        Example 5 (Ending):
         {"output": "The data has been inspected and imputed. The goal is met. The workflow will now end.", "next": "END", "msg": "Workflow complete."}
         """,
         tools=[]

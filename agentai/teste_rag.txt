@@ -29,8 +29,8 @@ If the basic EDA is done, but more analysis is needed, consider these actions fo
 * **Solution**: **Do not retry with the exact same instruction.** Change the strategy. The most reliable way to break a loop is to use the `inspect` node to perform the action that the failing node could not.
 
 **Node: `feature_engineer`**
-* **Problem**: The `feature_engineer` node returns an error or fails to create the columns.
-* **Solution**: This node can be rigid. The best alternative is to delegate the task to the `inspect` node, which is more flexible. For example: "Use the inspect node to create a new column named 'pressure_lag_1' which is the value of the 'pressure' column from the previous row."
+* **Problem**: Error in `feature_engineer` node problems to create the columns.
+* **Solution**: This node can be rigid. In this case, the alternative is to delegate the task to the `inspect` node, which is more flexible. For example: "Use the inspect node to create a new column named 'pressure_lag_1' which is the value of the 'pressure' column from the previous row."
 
 **Node: `inspect`**
 * **Problem**: The `inspect` node fails repeatedly with a `KeyError` or `AttributeError`.

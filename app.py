@@ -2,71 +2,99 @@ import streamlit as st
 import sys
 import os
 from uuid import uuid4
+import pandas as pd
 
 # Adiciona o diretório do projeto ao path para encontrar o pacote 'agentai'
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
-# Importa a classe principal do seu agente
+# Importa a classe principal do agente
 from agentai.workflow import WorkflowExecutor
 
-#Configuração da Página do Streamlit
 st.set_page_config(page_title="Agente de Análise de Dados", layout="wide")
 st.title("🤖 Agente de Pré-processamento de Dados")
-st.markdown("""
-Use esta interface para dar instruções ao seu agente de IA. 
-""")
+st.markdown("Faça o upload de um arquivo CSV e dê instruções em linguagem natural para o agente analisar e transformar seus dados.")
 
-# Inicialização do Agente
-def load_agent_executor():
-    csv_path = "agentai/datasets/test.csv"  
-    try:
-        executor = WorkflowExecutor(csv_path=csv_path)
-        return executor
-    except Exception as e:
-        st.error(f"Erro ao carregar o agente: {e}")
-        return None
+if 'executor' not in st.session_state:
+    st.session_state.executor = None
+if 'df_original' not in st.session_state:
+    st.session_state.df_original = None
+if 'df_modificado' not in st.session_state:
+    st.session_state.df_modificado = None
 
-executor = load_agent_executor()
+#Sidebar
+with st.sidebar:
+    st.header("1. Carregar Dados")
+    uploaded_file = st.file_uploader(
+        "Escolha um arquivo CSV",
+        type="csv"
+    )
 
-if executor:
-    #Interface do Usuário
-    st.header("Dê uma instrução para o Agente")
+    if uploaded_file is not None:
+        if st.button("Carregar e Iniciar Agente"):
+            with st.spinner("Lendo o arquivo e inicializando o agente..."):
+                try:
+                    df = pd.read_csv(uploaded_file)
+                    
+                    # Salva os DataFrames no estado da sessão
+                    st.session_state.df_original = df.copy()
+                    st.session_state.df_modificado = None # Reseta o df modificado
+                    
+                    # Inicializa o WorkflowExecutor com o DataFrame carregado
+                    st.session_state.executor = WorkflowExecutor(dataframe=df)
+                    st.success("Agente pronto para receber instruções!")
+                except Exception as e:
+                    st.error(f"Erro ao processar o arquivo: {e}")
+                    st.session_state.executor = None 
 
-    # Caixa de texto para o usuário inserir o prompt
+if st.session_state.executor is None:
+    st.info("Por favor, carregue um arquivo CSV na barra lateral para começar.")
+else:
+    # Exibe o DataFrame original
+    st.header("Visão Geral dos Dados Carregados")
+    st.dataframe(st.session_state.df_original)
+
+    st.header("2. Instruções para o Agente")
     prompt_usuario = st.text_area(
         "Descreva a tarefa que você quer que o agente execute:",
         height=150,
         placeholder="Ex: Crie uma feature de média móvel de 3 horas para a temperatura e depois um resumo dos dados."
     )
 
-    # Botão para iniciar a execução
+   
     if st.button("Executar Agente"):
         if prompt_usuario:
-            # Gera um ID único para cada execução
             thread_id = str(uuid4())
             
-            # Mostra uma mensagem de "rodando"
             with st.spinner("O agente está trabalhando... Por favor, aguarde."):
                 try:
+                    # Pega a instância do executor da sessão
+                    executor_instance = st.session_state.executor
                     
-                    final_state = executor.invoke(initial_message=prompt_usuario, thread_id=thread_id)
+                    # Executa o agente
+                    final_state = executor_instance.invoke(
+                        initial_message=prompt_usuario, 
+                        thread_id=thread_id
+                    )
 
-                    # Exibição dos Resultados
+                    
+                    st.session_state.df_modificado = executor_instance.df.copy()
+                    
                     st.success("O agente concluiu a tarefa!")
-                    
-                    st.subheader("Resultado Final")
-                    st.write(final_state) # Exibe o dicionário de estado final
-
-                    st.subheader("Logs da Execução")
-                    # Formata os logs para melhor visualização
-                    log_formatado = "\n".join([f"- {log}" for log in final_state.get("logs", [])])
-                    st.markdown(f"```\n{log_formatado}\n```")
 
                 except Exception as e:
                     st.error(f"Ocorreu um erro durante a execução do agente: {e}")
+                    # Limpa o resultado anterior em caso de erro
+                    st.session_state.df_modificado = None 
         else:
             st.warning("Por favor, insira uma instrução para o agente.")
 
-else:
-    st.error("A aplicação não pôde ser iniciada porque o agente não foi carregado.")
+    if st.session_state.df_modificado is not None:
+        st.header("3. DataFrame Processado")
+        st.dataframe(st.session_state.df_modificado)
+
+       
+        if 'final_state' in locals():
+             with st.expander("Ver Logs da Execução"):
+                log_formatado = "\n".join([f"- {log}" for log in final_state.get("logs", [])])
+                st.markdown(f"```\n{log_formatado}\n```")
 

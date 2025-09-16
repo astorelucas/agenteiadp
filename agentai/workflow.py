@@ -13,11 +13,16 @@ from agentai.tools import ImputationStrategyFactory
 
 
 class WorkflowExecutor:
-    def __init__(self, csv_path: str):
-        try:
-            self.df = pd.read_csv(csv_path)
-        except Exception as e:
-            raise ValueError(f"Falha ao carregar o dataset: {e}")
+    def __init__(self, dataframe: pd.DataFrame = None, csv_path: str = None):
+        if dataframe is not None:
+            self.df = dataframe.copy()
+        elif csv_path is not None:
+            try:
+                self.df = pd.read_csv(csv_path)
+            except Exception as e:
+                raise ValueError(f"Falha ao carregar o dataset do caminho: {e}")
+        else:
+            raise ValueError("Você deve fornecer um DataFrame ou um csv_path.")
         
         self.factory = ImputationStrategyFactory()
         self.graph = self._build_graph()

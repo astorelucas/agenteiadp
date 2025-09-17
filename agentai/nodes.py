@@ -240,9 +240,9 @@ class PlotterNode(Node):
             agent = create_plotter_agent(self.executor.df, self.executor.images_path, self.executor.llm, is_before_dp=is_before_dp)
             response = agent.invoke({"input": input_message})
             plotter_report = response.get("output", "") or str(response)
-            logs.append(f"Time series agent successfully executed instruction: '{msg}'")
+            logs.append(f"[Plotter Node]: Time series agent successfully executed instruction: '{msg}'")
         except Exception as e:
-            plotter_report = f"Time series agent failed to execute instruction '{msg}'. Error: {e}"
+            plotter_report = f"[Plotter Node]: Time series agent failed to execute instruction '{msg}'. Error: {e}"
             logs.append(plotter_report)
         
         return {"subagents_report": plotter_report, "logs": logs}

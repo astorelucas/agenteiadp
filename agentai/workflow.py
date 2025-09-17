@@ -18,19 +18,17 @@ from agentai.nodes import (
 
 
 class WorkflowExecutor:
-    def __init__(self, dataframe: pd.DataFrame = None, csv_path: str = None):
-        if dataframe is not None:
-            self.df = dataframe.copy()
-        elif csv_path is not None:
-            try:
-                self.df = pd.read_csv(csv_path)
-            except Exception as e:
-                raise ValueError(f"Falha ao carregar o dataset do caminho: {e}")
-        else:
-            raise ValueError("Você deve fornecer um DataFrame ou um csv_path.")
+    def __init__(self, llm, plot_images_path: str, csv_path: str = None):
+        try:
+            self.df = pd.read_csv(csv_path)
+            self.images_path = plot_images_path
+            self.llm = llm
+            self.factory = ImputationStrategyFactory()
+            self.graph = self._build_graph()
+        except Exception as e:
+            raise ValueError(f"Falha ao carregar o dataset: {e}")
         
-        self.factory = ImputationStrategyFactory()
-        self.graph = self._build_graph()
+        
 
     def _build_graph(self):
         workflow = StateGraph(AgentState)
@@ -107,19 +105,36 @@ class WorkflowExecutor:
     def invoke(self, initial_message: str, thread_id: str):
         """Executa o grafo e imprime apenas o resultado final."""
         config = {"configurable": {"thread_id": thread_id}}
+        # Usando o initial_state mais completo do seu segundo código
         initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message, "is_before_dp": True}
-     
-        final_state = self.graph.invoke(initial_state, config=config)
-        #, recursion_limit=15
+
+        final_state = {}
+
+        print("\n--- INICIANDO EXECUÇÃO DO GRAFO ---")
+
+        for chunk in self.graph.stream(initial_state, config=config, recursion_limit=30):
+            for node_name, state in chunk.items():
+                print(f"\n--- [ Nó Executado: {node_name} ] ---")
+
+                if report := state.get("subagents_report"):
+                    print("Relatório:")
+                    print(report)
+                    if node_name == "supervisor":
+                        print("-" * 25)
+
+                if node_name == "supervisor":
+                    print(f"Próximo passo planejado: '{state.get('next')}'")
+                    print(f"Instrução para o próximo agente: \"{state.get('msg')}\"")
+
+                elif node_name == "summarizer":
+                    print("Execução concluída. Gerando resumo...")
+
+                if state:
+                    final_state = state
+
+        print("\n\n--- FIM DA EXECUÇÃO DO GRAFO ---")
         
-        print("\n--- RESULTADO FINAL DO GRAFO ---")
-        for key, value in final_state.items():
-            if key in ['subagents_report', 'next', 'summary']:
-                continue
-            print(f"  {key}: {value}")
-
         summary = final_state.get("summary", "ERRO: Nenhum resumo foi gerado.")
-
-        print(f"\n\nRESUMO:\n {summary}")
+        print(f"\n\nRESUMO:\n{summary}")
 
         return final_state

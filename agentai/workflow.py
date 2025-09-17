@@ -1,6 +1,4 @@
 import pandas as pd
-import re
-import json
 from typing import Literal
 
 from langgraph.graph import StateGraph, END
@@ -14,6 +12,7 @@ from agentai.nodes import (
     PandasNode,
     ImputatorNode,
     SupervisorNode,
+    RetrieverNode,
     PlotterNode
 )
 
@@ -40,14 +39,16 @@ class WorkflowExecutor:
         inspect_node = PandasNode(self)
         feature_engineer_node = FeatureEngineeringNode(self)
         imputator_node = ImputatorNode(self)
+        retriever_node = RetrieverNode()
         plotter_node = PlotterNode(self)
 
+        
         # register nodes using their execute methods
-
         workflow.add_node("supervisor", supervisor_node.execute)
         workflow.add_node("inspect", inspect_node.execute)
         workflow.add_node("feature_engineer", feature_engineer_node.execute)
         workflow.add_node("imputator", imputator_node.execute)
+        workflow.add_node("retriever", retriever_node.execute)
         workflow.add_node("plot", plotter_node.execute)
         workflow.add_node("summarizer", self._summarizer_node)
         
@@ -57,6 +58,7 @@ class WorkflowExecutor:
         workflow.add_edge("inspect", "supervisor")
         workflow.add_edge("feature_engineer", "supervisor") 
         workflow.add_edge("imputator", "supervisor")
+        workflow.add_edge("retriever", "supervisor")
         workflow.add_edge("summarizer", END)
         
         workflow.add_conditional_edges(
@@ -67,6 +69,7 @@ class WorkflowExecutor:
                 "plot": "plot",
                 "imputator": "imputator",
                 "feature_engineer": "feature_engineer", 
+                "retriever": "retriever",
                 "end": "summarizer",
             },
         )
@@ -74,9 +77,10 @@ class WorkflowExecutor:
         memory = MemorySaver()
         return workflow.compile(checkpointer=memory)
 
-    def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer","end"]:
+    def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer", "retriever", "end"]:
         next_decision = state.get("next", "").lower()
-        if  next_decision in ["inspect", "imputator", "plot", "feature_engineer"]:
+
+        if  next_decision in ["inspect", "imputator", "feature_engineer", "retriever", "plot"]:
             return next_decision
         else:
             return "end"
@@ -93,13 +97,13 @@ class WorkflowExecutor:
         try:
             response = summarizer_agent.invoke({"messages": [HumanMessage(content=prompt)]})
             summary_text = str(response.get("messages", [])[-1].content)
-            logs.append("Finished summarizing.")
+            logs.append("\n[Summarizer Node] Finished summarizing.")
         except Exception as e:
             summary_text = f"ERRO: Falha ao invocar o agente de resumo: {e}"
-            logs.append("An error occurred whilst summarizing the logs")
+            logs.append("\n[Summarizer Node] An error occurred whilst summarizing the logs")
 
         return {"logs": logs, "summary": summary_text}
-        
+
     def invoke(self, initial_message: str, thread_id: str):
         """Executa o grafo e imprime apenas o resultado final."""
         config = {"configurable": {"thread_id": thread_id}}

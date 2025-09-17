@@ -47,8 +47,6 @@ def execute_pipeline():
     print("\n--- INICIANDO EXECUÇÃO DO GRAFO ---")
     executor.invoke(initial_message=initial_prompt, thread_id=thread_id)
     print("--- FIM DA EXECUÇÃO DO GRAFO ---\n")
-    # print("\n--- DataFrame Final Após a Execução ---")
-    # print(executor.df)
 
 if __name__ == "__main__":
     execute_pipeline()

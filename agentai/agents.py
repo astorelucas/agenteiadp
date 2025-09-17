@@ -63,8 +63,6 @@ def create_supervisor_agent() -> AgentExecutor:
 
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
         IMPORTANT: If the 'Report from the previous step' contains an ERROR or indicates a FAILURE or if you see that it is in a LOOP, you MUST prioritize using the 'retriever' node to find a solution. DO NOT repeat the same failed instruction.
-        When using the 'retriever', the 'msg' field should be a clear of your problem or doubt. Formulate it as a search query for a RAG. It must cointain where it happened, which node etc. Do not be specific with your problem.
-
 
 
         Example 1 (Starting):

@@ -44,9 +44,7 @@ def execute_pipeline():
 
     initial_prompt = "Perform a complete exploratory data analysis on the quality of this dataset. Start with a general overview, then delve into the most important points you deem necessary, such as missing values, descriptive statistics, and potential outliers. Also create features."
 
-    print("\n--- INICIANDO EXECUÇÃO DO GRAFO ---")
     executor.invoke(initial_message=initial_prompt, thread_id=thread_id)
-    print("--- FIM DA EXECUÇÃO DO GRAFO ---\n")
 
 if __name__ == "__main__":
     execute_pipeline()

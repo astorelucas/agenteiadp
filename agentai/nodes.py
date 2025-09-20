@@ -8,7 +8,8 @@ from agentai.agents import (
     create_pandas_agent,
     create_supervisor_agent,
     create_imputator_agent,
-    create_plotter_agent
+    create_plotter_agent,
+    create_feedback_agent
 )
 
 
@@ -246,4 +247,53 @@ class PlotterNode(Node):
             logs.append(plotter_report)
         
         return {"subagents_report": plotter_report, "logs": logs}
+
+
+
+class FeedbackNode(Node):
+    def __init__(self, executor):
+        super().__init__("feedback")
+        self.executor = executor
+        self.agent = create_feedback_agent(self.executor.llm)
+        self.rag = RAG()
+
+    def execute(self, state: AgentState) -> dict:
+        logs = state.get("logs", [])
+        summary = state.get("summary", "")
+
+        input_message = (
+            f"Execution Logs:\n{logs}\n\n"
+            f"Summary:\n{summary}\n\n"
+            "Decide if there is knowledge worth storing."
+        )
+
+        try:
+            response = self.agent.invoke({"messages": [HumanMessage(content=input_message)]})
+            raw_output = str(response.get("messages", [])[-1].content)
+
+            import json, re
+            json_match = re.search(r"\{.*\}", raw_output, re.DOTALL)
+            if not json_match:
+                report = "[Feedback Node] No valid JSON produced by the agent."
+                logs.append(report)
+                return {"logs": logs, "feedback": None, "summary": summary, "subagents_report": report}
+
+            decision = json.loads(json_match.group(0))
+            if decision.get("store"):
+                insight = decision.get("insight", "").strip()
+                if insight:
+                    self.rag.store([insight])
+                    report = f"[Feedback Node] Stored new insight: {insight}"
+                    logs.append(report)
+                    return {"logs": logs, "feedback": insight, "summary": summary, "subagents_report": report}
+            
+            report = "[Feedback Node] No relevant insight to store."
+            logs.append(report)
+            return {"logs": logs, "feedback": None, "summary": summary, "subagents_report": report}
+
+        except Exception as e:
+            report = f"[Feedback Node] Error during execution: {e}"
+            logs.append(report)
+            return {"logs": logs, "feedback": None, "summary": summary, "subagents_report": report}
+
 

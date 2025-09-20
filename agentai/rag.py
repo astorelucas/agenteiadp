@@ -67,6 +67,10 @@ class RAG():
         splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
         document_chunks = splitter.create_documents(texts)
         self.vectorstore.add_documents(documents=document_chunks)
+        
+        self.retriever = self.vectorstore.as_retriever(search_kwargs={'k': 6})
+    
+        print("Novos documentos foram adicionados e o retriever foi atualizado.")
 
     
     def retrieve(self, query: str):

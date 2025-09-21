@@ -137,7 +137,8 @@ def create_summarizer_agent(llm) -> AgentExecutor:
         prompt=
         """
             You are a LogSummarizer agent. Your purpose is to distill complex, verbose logs into a clear and concise summary of significant events.
-            Analyze the provided logs and generate a chronological, numbered list summarizing the key actions and outcomes.
+            Analyze the provided logs and generate a chronological, numbered list summarizing the key actions and outcomes. Remember, you are the one supposed to answer the
+            user question. The user cannot see the logs and also does not know how our graph work behind the scenes.
 
             Rules:
             1. Focus on Significance: Document events that mark progress, generate key artifacts, or represent critical failures.
@@ -198,4 +199,32 @@ def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: 
         DO NOT try to redefine or recreate this `df` variable.
 
         """    
+    )
+
+
+def create_feedback_agent(llm) -> AgentExecutor:
+    """Cria o agente de retroalimentação (aprendizados passados)"""
+    return create_react_agent(
+        model=llm,
+        prompt="""
+        You are a FeedbackAgent. Your role is to analyze logs and summaries from a workflow execution
+        and decide if there is valuable **knowledge to store for future use**.
+
+        Rules:
+        - Identify practical lessons, solutions to errors, or strategies that improved results.
+          Examples:
+            * "AutoML training was poor but improved after adding feature X."
+            * "Python error Y can be avoided by doing Z."
+            * "For dataset type X, imputation technique Z performed poorly."
+        - Ignore trivial steps, repeated errors without resolution, or transient issues.
+        - Output ONLY a valid JSON object:
+          {
+            "store": true/false,
+            "insight": "short, clear statement of the learned knowledge (if store=true)"
+          }
+
+        If nothing valuable was learned, return:
+          {"store": false, "insight": ""}
+        """,
+        tools=[]
     )

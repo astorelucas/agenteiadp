@@ -13,7 +13,8 @@ from agentai.nodes import (
     ImputatorNode,
     SupervisorNode,
     RetrieverNode,
-    PlotterNode
+    PlotterNode,
+    FeedbackNode
 )
 
 
@@ -39,7 +40,7 @@ class WorkflowExecutor:
         imputator_node = ImputatorNode(self)
         retriever_node = RetrieverNode()
         plotter_node = PlotterNode(self)
-
+        feedback_node = FeedbackNode(self)
         
         # register nodes using their execute methods
         workflow.add_node("supervisor", supervisor_node.execute)
@@ -49,6 +50,7 @@ class WorkflowExecutor:
         workflow.add_node("retriever", retriever_node.execute)
         workflow.add_node("plot", plotter_node.execute)
         workflow.add_node("summarizer", self._summarizer_node)
+        workflow.add_node("feedback", feedback_node.execute)
         
         workflow.set_entry_point("plot")
 
@@ -57,7 +59,9 @@ class WorkflowExecutor:
         workflow.add_edge("feature_engineer", "supervisor") 
         workflow.add_edge("imputator", "supervisor")
         workflow.add_edge("retriever", "supervisor")
+        workflow.add_edge("feedback", "summarizer")
         workflow.add_edge("summarizer", END)
+
         
         workflow.add_conditional_edges(
             "supervisor",
@@ -68,7 +72,7 @@ class WorkflowExecutor:
                 "imputator": "imputator",
                 "feature_engineer": "feature_engineer", 
                 "retriever": "retriever",
-                "end": "summarizer",
+                "end": "feedback",
             },
         )
 

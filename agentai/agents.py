@@ -1,8 +1,8 @@
 import os
 from dotenv import load_dotenv
 from getpass import getpass
+from dotenv import load_dotenv
 import pandas as pd
-from langchain_community.chat_models import ChatDeepInfra
 from sklearn.experimental import enable_iterative_imputer
 from langchain.agents import AgentExecutor
 from langgraph.prebuilt import create_react_agent
@@ -12,10 +12,13 @@ from agentai.tools import (
     make_plot_tools
 )
 
+# load_dotenv()
+
 #os.environ["DEEPINFRA_API_KEY"] = getpass("Enter your key: ")
 # llm = ChatDeepInfra(model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8")
 
 #llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct")
+
 
 # create_supervisor_agent: '{' instead of '{{', because its not fstring, just a normal string
 # create_pandas_agent: if needed, use '{{' instead of '{', as it uses a fstring internally (????????????????????)
@@ -34,7 +37,6 @@ def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         IMPORTANT: You are working with a DataFrame that is ALREADY loaded into a variable named `df`.
         DO NOT try to redefine or recreate this `df` variable.
         Directly apply your pandas commands to the `df` variable, for example: `df.describe()`.
-
         - Carefully follow the user's instruction.
         - Use the available tools to perform the analysis.
         - Your final response MUST BE a clear report of your findings.
@@ -59,17 +61,19 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         1.  **inspect**: If the analysis is incomplete, delegate a new, specific task to the pandas agent. The task should be a logical next step towards the main goal. 
         2.  **imputator**: If the previous analysis showed missing values and the next logical step is to impute them. You must delegate this to the imputation specialist.
         3.  **feature_engineer**: If the task is to create new columns or features (like rolling averages, lags, etc.), delegate this to the feature engineering node.
-        4.  **plot**: If the inspection is done and you believe that visualizations will help in understanding the data better, delegate a task to the plotter agent.
-        5.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
+        4. **retriever**: To solve problems (like code errors, bad results) or for strategic guidance, you must use the retriever to consult past experiences.
+        5.  **plot**: If the inspection is done and you believe that visualizations will help in understanding the data better, delegate a task to the plotter agent.
+        6.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
-        - "next": The next action, which must be either "inspect", "imputator", "plot" or "END".
+        - "next": The next action, which must be either "inspect", "imputator", "retriever", "plot" or "END".
         - "msg": A clear and specific instruction for the next agent if the action is 'inspect' or 'plot'. For 'imputator', this should be a descriptive context of the dataset for it to make a decision.
         - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. This is important for the plotter agent to know.
 
-
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
+        IMPORTANT: If the 'Report from the previous step' contains an ERROR or indicates a FAILURE or if you see that it is in a LOOP, you MUST prioritize using the 'retriever' node to find a solution. DO NOT repeat the same failed instruction.
+
 
         Example 1 (Starting):
         {"output": "The analysis has just started. I will begin by getting an overview of the dataset.", "next": "inspect", "msg": "Summarize the dataset, checking for missing values and data types.", "is_before_dp": "True"}
@@ -77,7 +81,13 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         Example 2 (Delegating Imputation):
         {"output": "The inspection revealed missing data in several columns. I will now delegate the task of choosing the best imputation method to the specialist.", "next": "imputator", "msg": "The initial analysis found missing values in the following columns: ['temperature', 'pressure']. The data appears to be time-series sensor data.", "is_before_dp": "True"}
 
-        Example 3 (Ending):
+        Example 3 (Using the Retriever Correctly):
+        {"output": "The feature_engineer node failed. I will search the knowledge base for a solution.", "next": "retriever", "msg": "error in feature_engineer node", is_before_dp": "False"}
+
+        Example 4 (Using the Retriever Correctly again):
+        {"output": "The inspect node raised an error. I will search the knowledge base for a solution.", "next": "retriever", "msg": "recursion limit error in inspect node", is_before_dp": "False"}
+
+        Example 5 (Ending):
         {"output": "The data has been inspected and imputed. The goal is met. The workflow will now end.", "next": "END", "msg": "Workflow complete.", is_before_dp": "False"}
         """,
         tools=[]
@@ -127,7 +137,8 @@ def create_summarizer_agent(llm) -> AgentExecutor:
         prompt=
         """
             You are a LogSummarizer agent. Your purpose is to distill complex, verbose logs into a clear and concise summary of significant events.
-            Analyze the provided logs and generate a chronological, numbered list summarizing the key actions and outcomes.
+            Analyze the provided logs and generate a chronological, numbered list summarizing the key actions and outcomes. Remember, you are the one supposed to answer the
+            user question. The user cannot see the logs and also does not know how our graph work behind the scenes.
 
             Rules:
             1. Focus on Significance: Document events that mark progress, generate key artifacts, or represent critical failures.
@@ -188,4 +199,32 @@ def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: 
         DO NOT try to redefine or recreate this `df` variable.
 
         """    
+    )
+
+
+def create_feedback_agent(llm) -> AgentExecutor:
+    """Cria o agente de retroalimentação (aprendizados passados)"""
+    return create_react_agent(
+        model=llm,
+        prompt="""
+        You are a FeedbackAgent. Your role is to analyze logs and summaries from a workflow execution
+        and decide if there is valuable **knowledge to store for future use**.
+
+        Rules:
+        - Identify practical lessons, solutions to errors, or strategies that improved results.
+          Examples:
+            * "AutoML training was poor but improved after adding feature X."
+            * "Python error Y can be avoided by doing Z."
+            * "For dataset type X, imputation technique Z performed poorly."
+        - Ignore trivial steps, repeated errors without resolution, or transient issues.
+        - Output ONLY a valid JSON object:
+          {
+            "store": true/false,
+            "insight": "short, clear statement of the learned knowledge (if store=true)"
+          }
+
+        If nothing valuable was learned, return:
+          {"store": false, "insight": ""}
+        """,
+        tools=[]
     )

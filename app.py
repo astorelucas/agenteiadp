@@ -3,12 +3,14 @@ import sys
 import os
 from uuid import uuid4
 import pandas as pd
+import tempfile
 
 # Adiciona o diretório do projeto ao path para encontrar o pacote 'agentai'
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 # Importa a classe principal do agente
 from agentai.workflow import WorkflowExecutor
+from langchain_community.chat_models import ChatDeepInfra
 
 st.set_page_config(page_title="Agente de Análise de Dados", layout="wide")
 st.title("🤖 Agente de Pré-processamento de Dados")
@@ -29,22 +31,38 @@ with st.sidebar:
         type="csv"
     )
 
+    
     if uploaded_file is not None:
         if st.button("Carregar e Iniciar Agente"):
             with st.spinner("Lendo o arquivo e inicializando o agente..."):
                 try:
-                    df = pd.read_csv(uploaded_file)
-                    
-                    # Salva os DataFrames no estado da sessão
+                    # Salvar CSV em arquivo temporário
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_file:
+                        tmp_file.write(uploaded_file.getbuffer())
+                        csv_path = tmp_file.name
+
+                    # Ler CSV para exibição no Streamlit
+                    df = pd.read_csv(csv_path)
                     st.session_state.df_original = df.copy()
-                    st.session_state.df_modificado = None # Reseta o df modificado
-                    
-                    # Inicializa o WorkflowExecutor com o DataFrame carregado
-                    st.session_state.executor = WorkflowExecutor(dataframe=df)
+                    st.session_state.df_modificado = None  # Reseta o df modificado
+
+                    # Criar instância do LLM (mesmo modelo usado no main.py)
+                    llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct")
+
+                    base_dir = os.path.dirname(__file__)
+                    images_path = os.path.join(base_dir, "agentai", "images", "plots")
+
+                    # Inicializa o WorkflowExecutor com o caminho do CSV
+                    st.session_state.executor = WorkflowExecutor(
+                        llm=llm,
+                        plot_images_path=images_path,
+                        csv_path=csv_path
+                    )
+
                     st.success("Agente pronto para receber instruções!")
                 except Exception as e:
                     st.error(f"Erro ao processar o arquivo: {e}")
-                    st.session_state.executor = None 
+                    st.session_state.executor = None
 
 if st.session_state.executor is None:
     st.info("Por favor, carregue um arquivo CSV na barra lateral para começar.")
@@ -79,6 +97,8 @@ else:
                     
                     st.session_state.df_modificado = executor_instance.df.copy()
                     
+                    st.session_state.last_result = final_state
+                    
                     st.success("O agente concluiu a tarefa!")
 
                 except Exception as e:
@@ -97,4 +117,25 @@ else:
              with st.expander("Ver Logs da Execução"):
                 log_formatado = "\n".join([f"- {log}" for log in final_state.get("logs", [])])
                 st.markdown(f"```\n{log_formatado}\n```")
+                
+    if "last_result" in st.session_state:
+        st.header("📊 Visualizações Geradas")
 
+        images_path = os.path.join(os.path.dirname(__file__), "agentai", "images", "plots")
+        if os.path.exists(images_path):
+            for root, dirs, files in os.walk(images_path):
+                for file in files:
+                    if file.endswith(".png"):
+                        st.image(os.path.join(root, file), caption=file, width="stretch")
+
+
+        else:
+            st.info("Nenhuma imagem foi gerada.")
+
+        with st.expander("📝 Logs da Execução", expanded=False):
+            logs = st.session_state.last_result.get("logs", [])
+            if logs:
+                log_formatado = "\n".join([f"- {log}" for log in logs])
+                st.markdown(f"```\n{log_formatado}\n```")
+            else:
+                st.info("Nenhum log registrado.")

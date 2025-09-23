@@ -340,7 +340,7 @@ def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> L
             # Plotar cada coluna em seu próprio subplot
             for i, col in enumerate(valid_cols):
                 ax = axes[i]
-                ax.plot(time_data, df[col], label=col, marker='o', markersize=2, color=f'C{i}')
+                ax.plot(time_data, valid_data[col], label=col, marker='o', markersize=2, color=f'C{i}')
                 ax.set_title(f"Time Series - {col}")
                 ax.set_xlabel("Time")
                 ax.set_ylabel(col)
@@ -353,8 +353,9 @@ def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> L
 
             plt.suptitle("Time Series Analysis by Column", fontsize=16, y=0.98)
             plt.tight_layout()
-            plt.subplots_adjust(top=0.93)
-            plt.savefig(f"{images_path}/time_series_plots.png", bbox_inches="tight", dpi=300)
+            os.makedirs(images_path, exist_ok=True)
+            plt.savefig(os.path.join(images_path, "time_series_plots.png"), bbox_inches="tight", dpi=300)
+
             plt.close()
 
             return {"msg": f"Time series subplots created successfully for columns: {valid_cols}"}
@@ -396,7 +397,9 @@ def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> L
             plt.ylabel(y)
             plt.title(f"{x} vs {y}")
             plt.tight_layout()
-            plt.savefig(f"{images_path}/scatter_plot_{x}_vs_{y}.png", bbox_inches="tight", dpi=300)
+            os.makedirs(images_path, exist_ok=True)
+            filename = f"scatter_{x_col}_vs_{y_col}.png"
+            plt.savefig(os.path.join(images_path, filename), bbox_inches="tight", dpi=300)
             plt.close()
 
             return {"msg": f"Scatter plot created successfully for {x} vs {y}"}
@@ -438,7 +441,10 @@ def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> L
 
             plt.suptitle("Histograms of numerical variables", fontsize=16, y=1.02)
             plt.tight_layout()
-            plt.savefig(f"{images_path}/histograms.png")
+            os.makedirs(images_path, exist_ok=True)
+            filename = f"histogram_{col}.png"
+            plt.savefig(os.path.join(images_path, filename), bbox_inches="tight", dpi=300)
+
             plt.close()
 
             return {"msg": "Histograms created successfully."}
@@ -461,7 +467,9 @@ def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> L
             sns.heatmap(corr, annot=True, cmap="coolwarm", center=0)
             plt.title("Correlation Heatmap")
             plt.tight_layout()
-            plt.savefig(f"{images_path}/correlation_heatmap.png")
+            os.makedirs(images_path, exist_ok=True)
+            plt.savefig(os.path.join(images_path, "heatmap.png"), bbox_inches="tight", dpi=300)
+
             plt.close()
 
             return {"msg": "Heatmap created successfully."}

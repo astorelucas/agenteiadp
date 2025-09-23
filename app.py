@@ -3,12 +3,14 @@ import sys
 import os
 from uuid import uuid4
 import pandas as pd
+import tempfile
 
 # Adiciona o diretório do projeto ao path para encontrar o pacote 'agentai'
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 # Importa a classe principal do agente
 from agentai.workflow import WorkflowExecutor
+from langchain_community.chat_models import ChatDeepInfra
 
 st.set_page_config(page_title="Agente de Análise de Dados", layout="wide")
 st.title("🤖 Agente de Pré-processamento de Dados")
@@ -33,14 +35,28 @@ with st.sidebar:
         if st.button("Carregar e Iniciar Agente"):
             with st.spinner("Lendo o arquivo e inicializando o agente..."):
                 try:
-                    df = pd.read_csv(uploaded_file)
-                    
-                    # Salva os DataFrames no estado da sessão
+                    # Salvar CSV em arquivo temporário
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_file:
+                        tmp_file.write(uploaded_file.getbuffer())
+                        csv_path = tmp_file.name
+                        
+                    # Ler CSV para exibição no Streamlit
+                    df = pd.read_csv(csv_path)
                     st.session_state.df_original = df.copy()
-                    st.session_state.df_modificado = None # Reseta o df modificado
+                    st.session_state.df_modificado = None  # Reseta o df modificado
+                 
+                    llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct")
                     
+                    base_dir = os.path.dirname(__file__)
+                    images_path = os.path.join(base_dir, "agentai", "images", "plots")
+
                     # Inicializa o WorkflowExecutor com o DataFrame carregado
-                    st.session_state.executor = WorkflowExecutor(dataframe=df)
+                    st.session_state.executor = WorkflowExecutor(
+                        llm=llm,
+                        plot_images_path=images_path,
+                        csv_path=csv_path
+                    )
+                    
                     st.success("Agente pronto para receber instruções!")
                 except Exception as e:
                     st.error(f"Erro ao processar o arquivo: {e}")

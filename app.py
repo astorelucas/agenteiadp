@@ -43,6 +43,7 @@ with st.sidebar:
 
                     # Ler CSV para exibição no Streamlit
                     df = pd.read_csv(csv_path)
+
                     st.session_state.df_original = df.copy()
                     st.session_state.df_modificado = None  # Reseta o df modificado
 
@@ -58,7 +59,7 @@ with st.sidebar:
                         plot_images_path=images_path,
                         csv_path=csv_path
                     )
-
+                    
                     st.success("Agente pronto para receber instruções!")
                 except Exception as e:
                     st.error(f"Erro ao processar o arquivo: {e}")

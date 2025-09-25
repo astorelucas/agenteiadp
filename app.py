@@ -118,15 +118,15 @@ else:
                 log_formatado = "\n".join([f"- {log}" for log in final_state.get("logs", [])])
                 st.markdown(f"```\n{log_formatado}\n```")
                 
-    if "last_result" in st.session_state:
-        st.header("📊 Visualizações Geradas")
+        if "last_result" in st.session_state:
+            st.header("📊 Visualizações Geradas")
 
-        images_path = os.path.join(os.path.dirname(__file__), "agentai", "images", "plots")
-        if os.path.exists(images_path):
-            for root, dirs, files in os.walk(images_path):
-                for file in files:
-                    if file.endswith(".png"):
-                        st.image(os.path.join(root, file), caption=file, width="stretch")
+            images_path = os.path.join(os.path.dirname(__file__), "agentai", "images", "plots")
+            if os.path.exists(images_path):
+                for root, dirs, files in os.walk(images_path):
+                    for file in files:
+                        if file.endswith(".png"):
+                            st.image(os.path.join(root, file), caption=file, width="content")
 
 
         else:

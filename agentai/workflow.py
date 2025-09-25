@@ -116,7 +116,8 @@ class WorkflowExecutor:
 
         print("\n--- INICIANDO EXECUÇÃO DO GRAFO ---")
 
-        for chunk in self.graph.stream(initial_state, config=config, recursion_limit=30):
+        for chunk in self.graph.stream(initial_state, config=config):
+            #, recursion_limit=30
             for node_name, state in chunk.items():
                 print(f"\n--- [ Nó Executado: {node_name} ] ---")
 

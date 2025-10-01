@@ -43,7 +43,7 @@ def execute_pipeline():
     thread_id = str(uuid4())
 
     # initial_prompt = "Perform a complete exploratory data analysis on the quality of this dataset. Start with a general overview, then delve into the most important points you deem necessary, such as missing values, descriptive statistics, and potential outliers. Also create features."
-    initial_prompt = "just tell me some random info about the dataset"
+    initial_prompt = "could make the preprocess of the dataset and give me predictions calling automl node?"
     executor.invoke(initial_message=initial_prompt, thread_id=thread_id)
 
 if __name__ == "__main__":

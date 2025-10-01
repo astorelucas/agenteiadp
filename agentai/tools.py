@@ -21,6 +21,8 @@ from sklearn.impute import KNNImputer
 from typing import List, Optional, Tuple, Dict, Any
 from abc import ABC, abstractmethod
 
+from pycaret.time_series import TSForecastingExperiment
+
 
 
 # abstract class 
@@ -549,7 +551,86 @@ def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> L
         
     return [plot_time_series, plot_scatter, plot_histograms, plot_heatmap, plot_boxplot, plot_scatter_matrix]
 
+def pycaret(dataset: pd.DataFrame, test_size: int, target: str, fh: int = 30) -> dict:
+    """
+    Perform time series forecasting using PyCaret.
+
+    Args:
+        dataset (pd.DataFrame): The input dataset.
+        test_size (int): The size of the test set.
+        target (str): The name of the target column.
+        fh (int): The forecast horizon (default is 30).
+
+    Returns:
+        dict: A dictionary containing real values, forecast values, and logs.
+    """
+    logs = []
+
+    # Validate inputs
+    if not isinstance(dataset, pd.DataFrame):
+        return {"error": "Invalid dataset. Must be a pandas DataFrame.", "logs": logs}
+
+    if not isinstance(test_size, int) or test_size <= 0:
+        return {"error": "Invalid test_size. Must be a positive integer.", "logs": logs}
+
+    if target not in dataset.columns:
+        return {"error": f"Target column '{target}' not found in dataset.", "logs": logs}
+
+    try:
+        # Reset index for PyCaret compatibility
+        dataset.index = range(0, dataset.shape[0])
+
+        # Split dataset into train and test
+        train = dataset.head(dataset.shape[0] - test_size)
+        test = dataset.tail(test_size)
+
+        logs.append("Dataset split into train and test sets.")
+
+        # Initialize PyCaret experiment
+        exp_auto = TSForecastingExperiment()
+        exp_auto.setup(
+            data=train,
+            target=target,
+            enforce_exogenous=True,
+            numeric_imputation_target="ffill",
+            numeric_imputation_exogenous="ffill",
+            session_id=42,
+        )
+
+        logs.append("PyCaret experiment setup completed.")
+
+        # Compare models
+        best = exp_auto.compare_models(verbose=True)
+        logs.append(f"Best model selected: {best}")
+
+        # Tune the best model
+        best_model = exp_auto.tune_model(
+            best,
+            choose_better=True,
+            n_iter=50,
+            fold=3,
+            search_algorithm="random",
+            tuner_verbose=True,
+        )
+        logs.append("Best model tuned successfully.")
+
+        # Forecast
+        forecast = exp_auto.predict_model(best_model, fh=fh)
+        logs.append("Forecasting completed.")
+
+        # Return results
+        real = test[target].values
+        forecast_values = forecast.values.flatten()
+
+        return {
+            "real": real,
+            "forecast": forecast_values,
+            "logs": logs
+        }
+
+    except Exception as e:
+        error_message = f"Error during PyCaret execution: {e}"
+        logs.append(error_message)
+        return {"error": error_message, "logs": logs}
 
 inspection_tools = [inspect_data]
-# cleaning_tools = [clean_data]
-# feature_tools = [imputacao_k_nearest_neighbors, imputacao_mice, imputacao_gp]

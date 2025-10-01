@@ -3,4 +3,6 @@
 .jpeg
 .jpg
 .bin
+.venv
+venv/
 __pycache__/

@@ -9,7 +9,8 @@ from langgraph.prebuilt import create_react_agent
 from langchain_experimental.agents import create_pandas_dataframe_agent
 from agentai.tools import (
     inspection_tools,
-    make_plot_tools
+    make_plot_tools,
+    pycaret
 )
 
 # load_dotenv()
@@ -227,4 +228,47 @@ def create_feedback_agent(llm) -> AgentExecutor:
           {"store": false, "insight": ""}
         """,
         tools=[]
+    )
+
+def create_automl_agent(df: pd.DataFrame, llm) -> AgentExecutor:
+    """Cria o agente AutoML"""
+    return create_react_agent(
+        model=llm,
+        df=df,
+        verbose=True,
+        agent_type="zero-shot-react-description",
+        allow_dangerous_code=True,
+        handle_parsing_errors=True,
+        prompt="""
+        You are an AutoMLAgent. Your role is to analyze the dataset and automatically select the best model and hyperparameters for the task.
+
+        Rules:
+        - Examine the dataset characteristics (e.g., size, feature types) and the task requirements (e.g., classification, regression).
+        - Collect the following inputs from the user:
+          1. `test_size`: The size of the test set (e.g., 30 rows).
+          2. `target`: The name of the target column in the dataset.
+        - Validate the inputs:
+          - Ensure `test_size` is a valid integer or float.
+          - Ensure `target` exists in the dataset columns.
+        - Select the most appropriate model from the available options.
+        - Optimize the model's hyperparameters using techniques like grid search or random search.
+        - Document the entire process, including the rationale for model selection and hyperparameter tuning.
+
+        The input dataset is already loaded into a variable named `df`.
+        DO NOT try to redefine or recreate this `df` variable.
+        Your final response MUST BE a clear report of your findings, including the selected model and hyperparameters.
+        IMPORTANT: Use double quotes for all keys and string values in the JSON.
+        Your response MUST be in the following EXACT format:
+
+        Output ONLY a valid JSON object:
+          {
+            "model": "selected_model_name",
+            "params": {
+              "param1": value1,
+              "param2": value2,
+              ...
+            }
+          }
+        """,
+        tools=[pycaret]
     )

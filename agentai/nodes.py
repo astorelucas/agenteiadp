@@ -9,7 +9,10 @@ from agentai.agents import (
     create_supervisor_agent,
     create_imputator_agent,
     create_plotter_agent,
-    create_feedback_agent
+    create_feedback_agent,
+    create_summarizer_agent,
+    create_automl_agent,
+    create_automl_agent
 )
 
 
@@ -296,4 +299,81 @@ class FeedbackNode(Node):
             logs.append(report)
             return {"logs": logs, "feedback": None, "summary": summary, "subagents_report": report}
 
+class SummarizerNode(Node):
+    def __init__(self, executor):
+        super().__init__("summarizer")
+        self.executor = executor
 
+    def execute(self, state:AgentState) -> dict:
+        summarizer_agent = create_summarizer_agent(self.executor.llm)
+
+        logs = state.get('logs', [])
+        logs_to_summarize = "\n".join(logs)
+        prompt = f"summarize the following logs:\n{logs_to_summarize}"
+
+        summary_text = ""
+        try:
+            response = summarizer_agent.invoke({"messages": [HumanMessage(content=prompt)]})
+            summary_text = str(response.get("messages", [])[-1].content)
+            logs.append("\n[Summarizer Node] Finished summarizing.")
+        except Exception as e:
+            summary_text = f"ERRO: Falha ao invocar o agente de resumo: {e}"
+            logs.append("\n[Summarizer Node] An error occurred whilst summarizing the logs")
+
+        return {"logs": logs, "summary": summary_text}
+    
+class AutoMLNode(Node):
+    def __init__(self, executor):
+        super().__init__("automl")
+        self.executor = executor
+
+    def execute(self, state: AgentState) -> dict:
+        automl_agent = create_automl_agent(self.executor.df, self.executor.llm)
+        logs = state.get("logs", [])
+        msg = state.get("msg", "")
+
+        # Extract parameters from the state
+        test_size = state.get("test_size")
+        target = state.get("target")
+
+        # Validate inputs
+        if not isinstance(test_size, (int, float)) or test_size <= 0:
+            error_message = "Invalid test_size. Must be a positive integer or float."
+            logs.append(f"[AutoML Node] {error_message}")
+            return {"subagents_report": error_message, "logs": logs}
+
+        if target not in self.executor.df.columns:
+            error_message = f"Target column '{target}' not found in the dataset."
+            logs.append(f"[AutoML Node] {error_message}")
+            return {"subagents_report": error_message, "logs": logs}
+
+        try:
+            # Invoke the AutoML agent
+            input_message = (
+                f"test_size: {test_size}\n"
+                f"target: {target}\n"
+                f"{msg}"
+            )
+            response = automl_agent.invoke({"input": input_message})
+
+            # Parse the response
+            raw_output = response.get("output", "") or str(response)
+            json_match = re.search(r"\{.*\}", raw_output, re.DOTALL)
+
+            if not json_match:
+                report = f"Error: AutoML agent failed to produce valid JSON. Output: {raw_output}"
+                logs.append(report)
+                return {"subagents_report": report, "logs": logs}
+
+            decision = json.loads(json_match.group(0))
+            model = decision.get("model")
+            params = decision.get("params", {})
+
+            report = f"AutoML selected model: {model} with parameters: {params}"
+            logs.append(report)
+
+        except Exception as e:
+            report = f"[AutoML Node] Error during execution: {e}"
+            logs.append(report)
+
+        return {"subagents_report": report, "logs": logs}

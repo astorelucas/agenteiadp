@@ -9,7 +9,8 @@ from agentai.agents import (
     create_supervisor_agent,
     create_imputator_agent,
     create_plotter_agent,
-    create_feedback_agent
+    create_feedback_agent,
+    create_feature_engineering_agent
 )
 
 
@@ -45,37 +46,26 @@ class FeatureEngineeringNode(Node):
         df = getattr(self.executor, "df", None)
 
         if df is None:
-            error_report = "\n[FeatureEngineeringNode] no DataFrame available on executor."
+            error_report = "[FeatureEngineeringNode] No DataFrame available on executor."
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
 
         try:
-            # Rolling average for 'temperature'
-            if "rolling average" in msg and "temperature" in msg:
-                logs.append("\n[FeatureEngineeringNode] Executing: Create rolling average for temperature.")
-                new_col = 'temperature_rolling_avg_3h'
-                df[new_col] = df['temperature'].rolling(window=3, min_periods=1).mean().fillna(method="bfill")
-                report = f"Successfully created column: {new_col}"
+            agent = create_feature_engineering_agent(df, self.executor.llm)
+            response = agent.invoke({"input": msg})
+            fe_report = response.get("output", "") or str(response)
 
-            # Rolling standard deviation for 'temperature'
-            elif "standard deviation" in msg and "temperature" in msg:
-                logs.append("\n[FeatureEngineeringNode] Executing: Create rolling standard deviation for temperature.")
-                new_col = 'temperature_rolling_std_3h'
-                df[new_col] = df['temperature'].rolling(window=3, min_periods=1).std().fillna(0)
-                report = f"Successfully created column: {new_col}"
+            # Pega o df atualizado
+            self.executor.df = df  
 
-            else:
-                report = "ERROR: No specific feature engineering task found in the instruction."
-
-            # Persist changes back to the executor
-            self.executor.df = df
-            logs.append(report)
-            return {"subagents_report": report, "logs": logs}
+            logs.append(f"[FeatureEngineeringNode] Executed instruction: '{msg}' -> {fe_report}")
+            return {"subagents_report": fe_report, "logs": logs}
 
         except Exception as e:
-            error_report = f"Error in feature engineering node: {e}"
+            error_report = f"[FeatureEngineeringNode] Error: {e}"
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
+
 
 
 class PandasNode(Node):

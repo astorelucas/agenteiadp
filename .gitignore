@@ -4,3 +4,4 @@
 .jpg
 .bin
 __pycache__/
+tests/

@@ -60,14 +60,16 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         Based on the current state, decide what to do next. The possible actions are:
         1.  **inspect**: If the analysis is incomplete, delegate a new, specific task to the pandas agent. The task should be a logical next step towards the main goal. 
         2.  **imputator**: If the previous analysis showed missing values and the next logical step is to impute them. You must delegate this to the imputation specialist.
-        3.  **feature_engineer**: If the task is to create new columns or features (like rolling averages, lags, etc.), delegate this to the feature engineering node.
+        3.  **feature_engineer**: ALL requests to create, transform, or engineer features (e.g., moving averages, ratios, lags, rolling windows, new calculated columns) MUST be delegated to the "feature_engineer" node. 
+        - NEVER let the 'inspect' or 'plot' nodes create new columns. 
+        - If a user instruction contains words like "create", "add", "generate", "calculate new feature", or any transformation of existing columns, ALWAYS delegate to "feature_engineer".
         4. **retriever**: To solve problems (like code errors, bad results) or for strategic guidance, you must use the retriever to consult past experiences.
         5.  **plot**: If the inspection is done and you believe that visualizations will help in understanding the data better, delegate a task to the plotter agent.
         6.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
-        - "next": The next action, which must be either "inspect", "imputator", "retriever", "plot" or "END".
+        - "next": The next action, which must be either "inspect", "imputator", "feature_engineer", "retriever", "plot" or "END".
         - "msg": A clear and specific instruction for the next agent if the action is 'inspect' or 'plot'. For 'imputator', this should be a descriptive context of the dataset for it to make a decision.
         - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. This is important for the plotter agent to know.
 
@@ -80,14 +82,17 @@ def create_supervisor_agent(llm) -> AgentExecutor:
 
         Example 2 (Delegating Imputation):
         {"output": "The inspection revealed missing data in several columns. I will now delegate the task of choosing the best imputation method to the specialist.", "next": "imputator", "msg": "The initial analysis found missing values in the following columns: ['temperature', 'pressure']. The data appears to be time-series sensor data.", "is_before_dp": "True"}
+        
+        Example 3 (Delegating Feature Engineering):
+        {"output": "The user requested a new feature (3-hour rolling average). This is clearly a feature engineering task.", "next": "feature_engineer", "msg": "Create a 3-hour rolling average for the temperature column.", "is_before_dp": "False"}
 
-        Example 3 (Using the Retriever Correctly):
+        Example 4 (Using the Retriever Correctly):
         {"output": "The feature_engineer node failed. I will search the knowledge base for a solution.", "next": "retriever", "msg": "error in feature_engineer node", is_before_dp": "False"}
 
-        Example 4 (Using the Retriever Correctly again):
+        Example 5 (Using the Retriever Correctly again):
         {"output": "The inspect node raised an error. I will search the knowledge base for a solution.", "next": "retriever", "msg": "recursion limit error in inspect node", is_before_dp": "False"}
 
-        Example 5 (Ending):
+        Example 6 (Ending):
         {"output": "The data has been inspected and imputed. The goal is met. The workflow will now end.", "next": "END", "msg": "Workflow complete.", is_before_dp": "False"}
         """,
         tools=[]
@@ -227,4 +232,31 @@ def create_feedback_agent(llm) -> AgentExecutor:
           {"store": false, "insight": ""}
         """,
         tools=[]
+    )
+    
+def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
+    """
+    Agente especializado em criar features usando pandas.
+    """
+    return create_pandas_dataframe_agent(
+        llm=llm,
+        df=df,
+        verbose=True,
+        agent_type="zero-shot-react-description",
+        allow_dangerous_code=True,
+        prefix="""
+        You are a Feature Engineering expert working with a pandas DataFrame called `df`.
+        
+        MAIN GOAL:
+        - Your ONLY job is to create, transform, or engineer new features in the DataFrame.
+        - Do not summarize or analyze the dataset. Only create or transform columns as requested.
+        - Always update the DataFrame `df` directly.
+        - After finishing, report exactly which new columns were created or transformed.
+
+        RULES:
+        - Never drop the DataFrame or reload it.
+        - Do not generate plots.
+        - If the instruction is ambiguous, assume reasonable defaults (e.g., rolling averages use window=3).
+        - Always explain briefly what you did in your final report.
+        """
     )

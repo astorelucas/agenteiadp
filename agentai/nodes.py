@@ -181,7 +181,7 @@ class SupervisorNode(Node):
         next_step = plan.get("next", "END")
         msg_out = plan.get("msg", state.get("msg"))
         output = plan.get("output", "")
-        is_before_dp = plan.get("is_before_dp").lower() == "true"
+        is_before_dp = str(plan.get("is_before_dp")).lower() == "true"
         logs.append(f"Supervisor decision: {output}")
         
         return {
@@ -251,8 +251,10 @@ class FeedbackNode(Node):
         logs = state.get("logs", [])
         summary = state.get("summary", "")
 
+        log_string = "\n".join(logs)
+
         input_message = (
-            f"Execution Logs:\n{logs}\n\n"
+            f"Execution Logs:\n{log_string}\n\n"
             f"Summary:\n{summary}\n\n"
             "Decide if there is knowledge worth storing."
         )

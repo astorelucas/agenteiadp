@@ -9,7 +9,8 @@ from langgraph.prebuilt import create_react_agent
 from langchain_experimental.agents import create_pandas_dataframe_agent
 from agentai.tools import (
     inspection_tools,
-    make_plot_tools
+    make_plot_tools,
+    retrieve_context
 )
 
 # load_dotenv()
@@ -30,18 +31,16 @@ def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         verbose=True,
         agent_type="zero-shot-react-description",
         allow_dangerous_code=True,
-        extra_tools= inspection_tools,
-        prefix="""You are a data analysis expert working with a pandas DataFrame.
-        Your primary goal is to execute a specific task given to you and report the results.
+        extra_tools= inspection_tools + [retrieve_context],
+        prefix="""
+        You are a Python data analysis agent working with a pandas DataFrame. Your goal is to answer the user's question by performing analysis on a pre-loaded DataFrame.
 
-        IMPORTANT: You are working with a DataFrame that is ALREADY loaded into a variable named `df`.
-        DO NOT try to redefine or recreate this `df` variable.
-        Directly apply your pandas commands to the `df` variable, for example: `df.describe()`.
-        - Carefully follow the user's instruction.
-        - Use the available tools to perform the analysis.
-        - Your final response MUST BE a clear report of your findings.
-        DO NOT CREATE PLOTS. Your only job is to analyze the data and report the results.
-        IMPORTANT: In the report findings, ALWAYS include plot suggestions, but DO NOT create the plots yourself.
+        **KEY INSTRUCTIONS:**
+        1.  **THE DATAFRAME EXISTS:** You are given a DataFrame named `df`. All your work must be done on this `df` variable. DO NOT create or load a new one.
+        2.  **GET HELP WHEN STUCK:** You have a retriever tool that acts as a knowledge base. If you encounter an error, are unsure how to approach the user's request, or need a specific analysis technique or even if you need an advice, use this tool for guidance. Formulate a clear question about your problem to find relevant solutions or examples.
+        3.  **TEXT-ONLY OUTPUT:** You are forbidden from creating plots or images. Your entire response must be text.
+        4.  **PRODUCE A REPORT:** Your final answer must be a clear, written report summarizing your findings.
+        
         """
     )
 
@@ -50,6 +49,7 @@ def create_supervisor_agent(llm) -> AgentExecutor:
     """Creates the supervisor agent"""
     return create_react_agent(
         model=llm,
+        tools=[],
         prompt=
         """
         You are a SUPERVISOR agent, an expert in planning and coordinating an Exploratory Data Analysis (EDA) workflow.
@@ -70,7 +70,7 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
         - "next": The next action, which must be either "inspect", "imputator", "feature_engineer", "retriever", "plot" or "END".
-        - "msg": A clear and specific instruction for the next agent if the action is 'inspect' or 'plot'. For 'imputator', this should be a descriptive context of the dataset for it to make a decision.
+        - "msg": A clear and specific instruction for the next agent. Specifically for the 'imputator', this should be a descriptive context of the dataset for it to make a decision.
         - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. This is important for the plotter agent to know.
 
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
@@ -87,30 +87,31 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         {"output": "The user requested a new feature (3-hour rolling average). This is clearly a feature engineering task.", "next": "feature_engineer", "msg": "Create a 3-hour rolling average for the temperature column.", "is_before_dp": "False"}
 
         Example 4 (Using the Retriever Correctly):
-        {"output": "The feature_engineer node failed. I will search the knowledge base for a solution.", "next": "retriever", "msg": "error in feature_engineer node", is_before_dp": "False"}
-
-        Example 5 (Using the Retriever Correctly again):
-        {"output": "The inspect node raised an error. I will search the knowledge base for a solution.", "next": "retriever", "msg": "recursion limit error in inspect node", is_before_dp": "False"}
+        {"output": "The feature_engineer node failed. I will search the knowledge base for a solution.", "next": "retriever", "msg": "error in feature_engineer node: the node got stuck in a loop", is_before_dp": "False"}
 
         Example 6 (Ending):
         {"output": "The data has been inspected and imputed. The goal is met. The workflow will now end.", "next": "END", "msg": "Workflow complete.", is_before_dp": "False"}
         """,
-        tools=[]
     )
 
 def create_imputator_agent(llm) -> AgentExecutor:
     """Creates the imputator agent"""
     return create_react_agent(
         model=llm,
+        tools=[retrieve_context],
         prompt=
         """
-        You are an IMPUTATOR agent, an expert in data imputation techniques.
-        Your sole job is to analyze the context provided about a dataset and decide the BEST imputation method.
-        You have three methods available: 'knn', 'mice', and 'gp'.
+        You are an IMPUTATOR agent, an expert in data imputation techniques. Your sole job is to analyze the context provided about a dataset and decide the BEST imputation method.
+        You have three main methods available: 'knn', 'mice', and 'gp'.
         
-        - Use 'knn' for data with local patterns (like sensor data) or simple relationships. It is computationally cheap.
-        - Use 'mice' for data with complex relationships between variables. It is more robust than knn and handles various data types well.
-        - Use 'gp' (Gaussian Process) for time-series or data where estimating uncertainty is crucial. It is computationally very expensive and best for small datasets.
+
+        - 'knn' is recommended for data with local patterns (like sensor data) or simple relationships. It is computationally cheap.
+        - 'mice' is recommended for data with complex relationships between variables. It is more robust than knn and handles various data types well.
+        - 'gp' (Gaussian Process) is recommended for time-series or data where estimating uncertainty is crucial. It is computationally very expensive and best for small datasets.
+
+        **GET HELP WHEN STUCK:** You have a retriever tool that acts as a knowledge base. If you encounter an error, are unsure how to approach the user's request, or need a specific analysis technique or even if you need an advice, use this tool for guidance. Formulate a clear question about your problem to find relevant solutions or examples.
+        Note that you CAN use other interpolation methods, as long as you call the retrieve_context tool beforehand to receive guidance.
+        PLEASE USE YOUR TOOL BEFORE ANY ACTION TO GET SOME ADVICES.
 
         Based on the context, you MUST return ONLY a valid JSON object with your decision. The JSON must have two keys:
         - "method": A string with your chosen method, which must be one of ["knn", "mice", "gp"].
@@ -131,7 +132,7 @@ def create_imputator_agent(llm) -> AgentExecutor:
         Another valid response:
         {"method": "mice", "params": {"n_estimators": 10}}
         """,
-        tools=[]
+
     )
 
 
@@ -166,10 +167,8 @@ def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: 
     """
     Creates the plotter agent
     """
-
     plotting_tools = make_plot_tools(df, images_path, is_before_dp)
 
-    # Create the ReAct agent
     return create_pandas_dataframe_agent(
         llm=llm,
         df=df,
@@ -177,11 +176,11 @@ def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: 
         agent_type="zero-shot-react-description",
         allow_dangerous_code=True,        
         handle_parsing_errors=True,
-        extra_tools = plotting_tools,
+        extra_tools = [retrieve_context] + plotting_tools,
         prefix="""
         You are a time series visualization specialist using pandas and Python.
 
-        MAIN INSTRUCTIONS:
+        *MAIN INSTRUCTIONS*:
         1. Your ONLY function is to create plots based on the provided data, user instructions, and tools available.
         2. If user specifies columns or filters, use only that data
         3. Always automatically identify the date/time column in the DataFrame
@@ -193,16 +192,14 @@ def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: 
         - ALWAYS just use the tools provided to create the plots
         - ALWAYS check the tools description to understand how to use them
         - NEVER try to create plots manually using matplotlib, seaborn, or any other library
+        - You are working with a DataFrame that is ALREADY loaded into a variable named `df`, do not try to redefine it.
 
-        AVAILABLE TOOLS:
+        *AVAILABLE TOOLS*:
         - plot_time_series: Create a time series line plot for one or more numeric columns over time.
         - plot_scatter: Create a scatter plot to visualize relationships between two numeric variables.
         - plot_histograms: Create histograms to show the distribution of numeric variables.
         - plot_heatmap: Create a heatmap to visualize correlations between numeric variables.
-
-        IMPORTANT: You are working with a DataFrame that is ALREADY loaded into a variable named `df`.
-        DO NOT try to redefine or recreate this `df` variable.
-
+        - retrieve_context: Useful to learn how to solve problems or to get advices via RAG. Do not hesitate to use it after ANY error.
         """    
     )
 
@@ -212,8 +209,7 @@ def create_feedback_agent(llm) -> AgentExecutor:
     return create_react_agent(
         model=llm,
         prompt="""
-        You are a FeedbackAgent. Your role is to analyze logs and summaries from a workflow execution
-        and decide if there is valuable **knowledge to store for future use**.
+        You are a FeedbackAgent. Your role is to analyze logs and summaries from a workflow execution and decide if there is valuable **knowledge to store for future use**.
 
         Rules:
         - Identify practical lessons, solutions to errors, or strategies that improved results.
@@ -242,6 +238,7 @@ def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         llm=llm,
         df=df,
         verbose=True,
+        extra_tools=[retrieve_context],
         agent_type="zero-shot-react-description",
         allow_dangerous_code=True,
         prefix="""
@@ -253,6 +250,8 @@ def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         - Always update the DataFrame `df` directly.
         - After finishing, report exactly which new columns were created or transformed.
 
+        You have a retriever tool that acts as a knowledge base. If you need advices on which is the best approach, or if you encounter an error, use this tool for guidance. Formulate a clear question providing the whole context about your problem to find relevant solutions or examples.
+        
         RULES:
         - Never drop the DataFrame or reload it.
         - Do not generate plots.

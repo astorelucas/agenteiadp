@@ -17,7 +17,7 @@ class RAG():
         self.document = document 
         self.persist_directory = persist_directory
         self.collection_name = "long-term-memory"
-        self.embedding = DeepInfraEmbeddings(model_id="BAAI/bge-base-en-v1.5", deepinfra_api_token=API_KEY) # which is better?
+        self.embedding = DeepInfraEmbeddings(model_id="BAAI/bge-base-en-v1.5", deepinfra_api_token=API_KEY)
         self.retriever = None
 
         if os.path.exists(self.persist_directory) and os.path.isdir(self.persist_directory):
@@ -49,7 +49,7 @@ class RAG():
                 persist_directory=self.persist_directory,
             )
 
-            self.retriever = self.vectorstore.as_retriever(search_kwargs={'k': 6})
+            self.retriever = self.vectorstore.as_retriever(search_kwargs={'k': 5})
             print("Vector database built.\n")
         except Exception as e:
             print(f"Error while building vector database: {e}")
@@ -57,18 +57,18 @@ class RAG():
     def _load(self):
         try:
             self.vectorstore = Chroma(collection_name=self.collection_name, persist_directory=self.persist_directory, embedding_function=self.embedding)
-            self.retriever = self.vectorstore.as_retriever(search_kwargs={'k': 6})
+            self.retriever = self.vectorstore.as_retriever(search_kwargs={'k': 5})
             print("Vector database loaded successfully.")
         except Exception as e:
             print(f"Error while loading vector database: {str(e)}")
 
 
-    def store(self, texts: list[str]):
-        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
-        document_chunks = splitter.create_documents(texts)
-        self.vectorstore.add_documents(documents=document_chunks)
+    def store(self, text_content: str):
+        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)        
+        chunks = splitter.split_text(text_content)
+        self.vectorstore.add_texts(texts=chunks)
         
-        self.retriever = self.vectorstore.as_retriever(search_kwargs={'k': 6})
+        self.retriever = self.vectorstore.as_retriever(search_kwargs={'k': 5})
     
         print("Novos documentos foram adicionados e o retriever foi atualizado.")
 
@@ -84,5 +84,6 @@ class RAG():
             print("No results found in RAG.\n\n")
             return "No relevant solution was found in the knowledge base. Please proceed with an alternative strategy."
 
+        print(f"Rag result:\n{results}\n")
         return "\n".join([doc.page_content for doc in results])
     

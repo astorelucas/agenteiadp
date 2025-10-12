@@ -109,15 +109,15 @@ class WorkflowExecutor:
     def invoke(self, initial_message: str, thread_id: str):
         """Executa o grafo e imprime apenas o resultado final."""
         config = {"configurable": {"thread_id": thread_id}}
-        # Usando o initial_state mais completo do seu segundo código
+
         initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message, "is_before_dp": True}
 
         final_state = {}
 
         print("\n--- INICIANDO EXECUÇÃO DO GRAFO ---")
 
-        for chunk in self.graph.stream(initial_state, config=config):
-            #, recursion_limit=30
+        for chunk in self.graph.stream(initial_state, config=config, recursion_limit=35):
+            
             for node_name, state in chunk.items():
                 print(f"\n--- [ Nó Executado: {node_name} ] ---")
 

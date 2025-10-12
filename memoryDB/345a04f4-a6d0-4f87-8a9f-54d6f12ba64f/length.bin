@@ -1,0 +1,7 @@
+---
+
+### Section 5: Imputation Method Selection Advice
+
+**When to use 'knn' (K-Nearest Neighbors):**
+- **Best for**: Datasets where data points that are "close" to each other are similar. Excellent for sensor data or spatial data. It's computationally faster than MICE or GP.
+- **Weakness**: Can be skewed by outliers. Assumes data is Missing at Random (MAR) or Missing Completely at Random (MCAR).^2

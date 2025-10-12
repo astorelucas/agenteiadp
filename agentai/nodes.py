@@ -303,7 +303,7 @@ class FeedbackNode(Node):
             if decision.get("store"):
                 insight = decision.get("insight", "").strip()
                 if insight:
-                    self.rag.store([insight])
+                    self.rag.store(insight)
                     report += f"Stored new insight: {insight}"
                     logs.append(report)
                     return {"logs": logs, "feedback": insight, "summary": summary, "subagents_report": report}

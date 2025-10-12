@@ -1,7 +1,1 @@
----
-
-### Section 5: Imputation Method Selection Advice
-
-**When to use 'knn' (K-Nearest Neighbors):**
-- **Best for**: Datasets where data points that are "close" to each other are similar. Excellent for sensor data or spatial data. It's computationally faster than MICE or GP.
-- **Weakness**: Can be skewed by outliers. Assumes data is Missing at Random (MAR) or Missing Completely at Random (MCAR).^2
+invalid type: string "---\n\n### Section 5: Imputation Method Selection Advice\n\n**When to use 'knn' (K-Nearest Neighbors):**\n- **Best for**: Datasets where data points that are \"close\" to each other are similar. Excellent for sensor data or spatial data. It's computationally faster than MICE or GP.\nsary: `df.replace([np.inf, -np.inf], np.nan, inplace=True)`.\n\n---\n\nng. Try removing them."

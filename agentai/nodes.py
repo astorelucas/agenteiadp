@@ -1,5 +1,8 @@
 import json
 import re
+from langchain.callbacks.base import BaseCallbackHandler
+from typing import Dict, Any
+
 
 from langchain_core.messages import HumanMessage
 from agentai.modules.common import AgentState
@@ -10,12 +13,9 @@ from agentai.agents import (
     create_imputator_agent,
     create_plotter_agent,
     create_feedback_agent,
-    create_summarizer_agent,
-    create_automl_agent,
+    create_feature_engineering_agent,
     create_automl_agent
 )
-
-
 
 class Node:
     def __init__(self, name: str, executor=None):
@@ -37,6 +37,19 @@ class Node:
         return self.run(state)
 
 
+class AgentThoughtCollector(BaseCallbackHandler):
+    """
+        Callback para coletar os pensamentos internos de uma a├º├úo de agente.
+        Utilidade: o pandas agente, por exemplo, n├úo coloca seus pensamentos na sua reposta final. Essa classe resolve isso
+    """
+    def __init__(self):
+        self.thoughts = []
+
+    def on_agent_action(self, action: Dict[str, Any], **kwargs: Any) -> Any:
+        if hasattr(action, 'log'):
+            self.thoughts.append(action.log)
+
+
 class FeatureEngineeringNode(Node):
     def __init__(self, executor):
         super().__init__("feature_engineer")
@@ -48,35 +61,23 @@ class FeatureEngineeringNode(Node):
         df = getattr(self.executor, "df", None)
 
         if df is None:
-            error_report = "\n[FeatureEngineeringNode] no DataFrame available on executor."
+            error_report = "[FeatureEngineeringNode] No DataFrame available on executor."
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
 
         try:
-            # Rolling average for 'temperature'
-            if "rolling average" in msg and "temperature" in msg:
-                logs.append("\n[FeatureEngineeringNode] Executing: Create rolling average for temperature.")
-                new_col = 'temperature_rolling_avg_3h'
-                df[new_col] = df['temperature'].rolling(window=3, min_periods=1).mean().fillna(method="bfill")
-                report = f"Successfully created column: {new_col}"
+            agent = create_feature_engineering_agent(df, self.executor.llm)
+            response = agent.invoke({"input": msg})
+            fe_report = response.get("output", "") or str(response)
 
-            # Rolling standard deviation for 'temperature'
-            elif "standard deviation" in msg and "temperature" in msg:
-                logs.append("\n[FeatureEngineeringNode] Executing: Create rolling standard deviation for temperature.")
-                new_col = 'temperature_rolling_std_3h'
-                df[new_col] = df['temperature'].rolling(window=3, min_periods=1).std().fillna(0)
-                report = f"Successfully created column: {new_col}"
+            # Pega o df atualizado
+            self.executor.df = df  
 
-            else:
-                report = "ERROR: No specific feature engineering task found in the instruction."
-
-            # Persist changes back to the executor
-            self.executor.df = df
-            logs.append(report)
-            return {"subagents_report": report, "logs": logs}
+            logs.append(f"[FeatureEngineeringNode] Executed instruction: '{msg}' -> {fe_report}")
+            return {"subagents_report": fe_report, "logs": logs}
 
         except Exception as e:
-            error_report = f"Error in feature engineering node: {e}"
+            error_report = f"[FeatureEngineeringNode] Error: {e}"
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
 
@@ -94,23 +95,37 @@ class PandasNode(Node):
 
         agent = create_pandas_agent(self.executor.df, self.executor.llm)
         current_input = msg
-        inspection_report = ""
+        report = "\n[Pandas Node] "
+
+        thought_collector = AgentThoughtCollector()
+
 
         for attempt in range(max_retries + 1):
             try:
-                response = agent.invoke({"input": current_input})
-                inspection_report = response.get("output", "") or str(response)
-                logs.append(f"Inspection agent successfully executed instruction: '{msg}'")
+                response = agent.invoke(
+                    {"input": current_input},
+                    config={"callbacks": [thought_collector]}
+                )
+                report += response.get("output", "") or str(response)
                 break
             except Exception as e:
                 logs.append(f"Attempt {attempt + 1}/{max_retries + 1} failed for instruction '{msg}'. Error: {e}")
                 if attempt == max_retries:
-                    inspection_report = f"Agent failed after {max_retries + 1} attempts. Final Error: {e}"
+                    report += f"Agent failed after {max_retries + 1} attempts. Final Error: {e}"
                     break
 
                 current_input = f"Your previous attempt failed with this error: {e}. Please correct your code and try again to accomplish the original task: {msg}"
+            
+        full_thought_process = "\n".join(thought_collector.thoughts)
+        
+        complete_report = (
+            f"{full_thought_process}\n"
+            f"FINAL REPORT:{report}"
+        )
 
-        return {"subagents_report": inspection_report, "logs": logs}
+        logs.append(f"[Pandas Node]: {complete_report}")
+
+        return {"subagents_report": complete_report, "logs": logs}
 
 
 class ImputatorNode(Node):
@@ -121,17 +136,17 @@ class ImputatorNode(Node):
     def execute(self, state: AgentState) -> dict:
         context = state.get("msg", "")
         logs = state.get("logs", [])
-        logs.append("\n[Imputator Node] Executing imputation node.")
-
+        
         imputator_agent = create_imputator_agent(self.executor.llm)
         response = imputator_agent.invoke({"messages": [HumanMessage(content=context)]})
-
         raw_output = str(response.get("messages", [])[-1].content)
         json_str_match = re.search(r'\{.*\}', raw_output, re.DOTALL)
 
+        report = f"\n[Imputator Node] "
+
         if not json_str_match:
-            report = f"Error: Imputator agent failed to produce valid JSON. Output: {raw_output}"
-            logs.append(report)
+            report += f"Error: Imputator agent failed to produce valid JSON. Output: {raw_output}"
+            logs.append(f"\n {report}")
             return {"subagents_report": report, "logs": logs}
 
         try:
@@ -139,18 +154,18 @@ class ImputatorNode(Node):
             method = decision.get("method")
             params = decision.get("params", {})
 
-            logs.append(f"Imputator agent decided on method '{method}' with params {params}.")
+            report += f"Imputator agent decided on method '{method}' with params {params}."
 
             strategy = self.executor.factory.create_strategy(name=method, **params)
             imputed_df = strategy.execute(self.executor.df)
             self.executor.df = imputed_df
-            report = f"Imputation using '{method}' strategy completed successfully."
-            logs.append(report)
+            report += f"Imputation using '{method}' strategy completed successfully."
 
         except (json.JSONDecodeError, ValueError, TypeError) as e:
-            report = f"Error processing imputator agent decision: {e}. Raw output: {raw_output}"
-            logs.append(report)
+            report += f"JSON error processing imputator agent decision: {e}. Raw output: {raw_output}"
+            
 
+        logs.append(report)
         return {"subagents_report": report, "logs": logs}
 
 
@@ -182,21 +197,21 @@ class SupervisorNode(Node):
         json_str_match = re.search(r'\{.*\}', raw_output, re.DOTALL)
 
         if not json_str_match:
-            logs.append(f"Supervisor failed to produce JSON. Output: {raw_output}")
+            logs.append(f"\n[Supervisor Node] Supervisor failed to produce JSON. Output: {raw_output}")
             return {"next": "END", "logs": logs}
 
         try:
             plan = json.loads(json_str_match.group(0))
         except json.JSONDecodeError:
-            logs.append(f"Supervisor produced invalid JSON. Output: {json_str_match.group(0)}")
+            logs.append(f"\n[Supervisor Node] Supervisor produced invalid JSON. Output: {json_str_match.group(0)}")
             return {"next": "END", "logs": logs}
 
         next_step = plan.get("next", "END")
         msg_out = plan.get("msg", state.get("msg"))
         output = plan.get("output", "")
-        is_before_dp = plan.get("is_before_dp")
-        logs.append(f"Supervisor decision: {output}")
-
+        is_before_dp = plan.get("is_before_dp").lower() == "true"
+        logs.append(f"\n[Supervisor Node] Decision made: {output}")
+        
         return_state = {
             "next": next_step,
             "msg": msg_out,
@@ -247,16 +262,17 @@ class PlotterNode(Node):
             f"If the instruction is not clear, create simple plots like scatter, time series, heatmap and histogram.\n"
         )
         
+        report = f"\n[Plotter Node] "
+
         try:
             agent = create_plotter_agent(self.executor.df, self.executor.images_path, self.executor.llm, is_before_dp=is_before_dp)
             response = agent.invoke({"input": input_message})
-            plotter_report = response.get("output", "") or str(response)
-            logs.append(f"[Plotter Node]: Time series agent successfully executed instruction: '{msg}'")
+            report += response.get("output", "") or str(response)
         except Exception as e:
-            plotter_report = f"[Plotter Node]: Time series agent failed to execute instruction '{msg}'. Error: {e}"
-            logs.append(plotter_report)
+            report += f"Time series agent failed to execute instruction. Error: {e}"
         
-        return {"subagents_report": plotter_report, "logs": logs}
+        logs.append(report)
+        return {"subagents_report": report, "logs": logs}
 
 
 
@@ -280,11 +296,12 @@ class FeedbackNode(Node):
         try:
             response = self.agent.invoke({"messages": [HumanMessage(content=input_message)]})
             raw_output = str(response.get("messages", [])[-1].content)
-
-            import json, re
             json_match = re.search(r"\{.*\}", raw_output, re.DOTALL)
+
+            report = f"\n[Feedback Node] "
+
             if not json_match:
-                report = "[Feedback Node] No valid JSON produced by the agent."
+                report += f"No valid JSON produced by the agent. Raw Output: {raw_output}"
                 logs.append(report)
                 return {"logs": logs, "feedback": None, "summary": summary, "subagents_report": report}
 
@@ -292,42 +309,19 @@ class FeedbackNode(Node):
             if decision.get("store"):
                 insight = decision.get("insight", "").strip()
                 if insight:
-                    self.rag.store([insight])
-                    report = f"[Feedback Node] Stored new insight: {insight}"
+                    self.rag.store(insight)
+                    report += f"Stored new insight: {insight}"
                     logs.append(report)
                     return {"logs": logs, "feedback": insight, "summary": summary, "subagents_report": report}
             
-            report = "[Feedback Node] No relevant insight to store."
+            report += "No relevant insight to store. Note: This is not an error."
             logs.append(report)
             return {"logs": logs, "feedback": None, "summary": summary, "subagents_report": report}
 
         except Exception as e:
-            report = f"[Feedback Node] Error during execution: {e}"
+            report += f"Error during execution: {e}"
             logs.append(report)
             return {"logs": logs, "feedback": None, "summary": summary, "subagents_report": report}
-
-class SummarizerNode(Node):
-    def __init__(self, executor):
-        super().__init__("summarizer")
-        self.executor = executor
-
-    def execute(self, state:AgentState) -> dict:
-        summarizer_agent = create_summarizer_agent(self.executor.llm)
-
-        logs = state.get('logs', [])
-        logs_to_summarize = "\n".join(logs)
-        prompt = f"summarize the following logs:\n{logs_to_summarize}"
-
-        summary_text = ""
-        try:
-            response = summarizer_agent.invoke({"messages": [HumanMessage(content=prompt)]})
-            summary_text = str(response.get("messages", [])[-1].content)
-            logs.append("\n[Summarizer Node] Finished summarizing.")
-        except Exception as e:
-            summary_text = f"ERRO: Falha ao invocar o agente de resumo: {e}"
-            logs.append("\n[Summarizer Node] An error occurred whilst summarizing the logs")
-
-        return {"logs": logs, "summary": summary_text}
     
 class AutoMLNode(Node):
     def __init__(self, executor):

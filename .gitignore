@@ -2,7 +2,7 @@
 .png
 .jpeg
 .jpg
-.bin
-.venv
-venv/
+.txt
 __pycache__/
+tests/
+venv/

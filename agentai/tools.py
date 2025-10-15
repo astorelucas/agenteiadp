@@ -1,6 +1,6 @@
 from langchain_community.tools import WikipediaQueryRun
 from langchain_community.utilities import WikipediaAPIWrapper
-from langchain.tools import Tool
+from langchain.tools import tool
 import pandas as pd
 import json
 import numpy as np
@@ -9,10 +9,10 @@ import os
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 import seaborn as sns
+
+
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
-
-from langchain.tools import tool
 from sklearn.impute import IterativeImputer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -20,6 +20,7 @@ from sklearn.impute import KNNImputer
 
 from typing import List, Optional, Tuple, Dict, Any
 from abc import ABC, abstractmethod
+from agentai.rag import RAG
 
 from pycaret.time_series import TSForecastingExperiment
 from pydantic import BaseModel, Field, StrictStr
@@ -400,7 +401,7 @@ def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> L
             plt.title(f"{x} vs {y}")
             plt.tight_layout()
             os.makedirs(images_path, exist_ok=True)
-            filename = f"scatter_{x_col}_vs_{y_col}.png"
+            filename = f"scatter_{x}_vs_{y}.png"
             plt.savefig(os.path.join(images_path, filename), bbox_inches="tight", dpi=300)
             plt.close()
 
@@ -648,5 +649,21 @@ def pycaret(df: pd.DataFrame, test_size: int, target: str, fh: int = 30) -> dict
         error_message = f"Error during PyCaret execution: {e}"
         logs.append(error_message)
         return {"error": error_message, "logs": logs}
+
+@tool
+def retrieve_context(query: str) -> dict:
+    """
+    Retrieves relevant context from the vector database using a RAG pipeline.
+    This function acts as a knowledge-base tool for agents, allowing them to fetch information to ground their responses or inform their actions.
+    *ALWAYS* use it when having errors or doubts or even if you are unsure about any future action!
+    
+    Args:
+        query: The natural language question or topic to search for.
+    Returns:
+        A dictionary containing the retrieved documents and associated metadata.
+    """
+    rag = RAG()
+    return rag.retrieve(query)
+
 
 inspection_tools = [inspect_data]

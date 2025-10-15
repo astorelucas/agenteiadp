@@ -667,3 +667,5 @@ def retrieve_context(query: str) -> dict:
 
 
 inspection_tools = [inspect_data]
+# cleaning_tools = [clean_data]
+# feature_tools = [imputacao_k_nearest_neighbors, imputacao_mice, imputacao_gp]

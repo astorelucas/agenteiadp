@@ -15,7 +15,6 @@ from agentai.nodes import (
     RetrieverNode,
     PlotterNode,
     FeedbackNode,
-    SummarizerNode,
     AutoMLNode
 )
 
@@ -43,7 +42,6 @@ class WorkflowExecutor:
         retriever_node = RetrieverNode()
         plotter_node = PlotterNode(self)
         feedback_node = FeedbackNode(self)
-        summarize_node = SummarizerNode(self)
         automl_node = AutoMLNode(self)
         
         # register nodes using their execute methods
@@ -53,7 +51,7 @@ class WorkflowExecutor:
         workflow.add_node("imputator", imputator_node.execute)
         workflow.add_node("retriever", retriever_node.execute)
         workflow.add_node("plot", plotter_node.execute)
-        workflow.add_node("summarizer", summarize_node.execute)
+        workflow.add_node("summarizer", self._summarizer_node)
         workflow.add_node("feedback", feedback_node.execute)
         workflow.add_node("automl", automl_node.execute)
         
@@ -93,6 +91,24 @@ class WorkflowExecutor:
             return next_decision
         else:
             return "end"
+        
+    def _summarizer_node(self, state:AgentState) -> dict:
+        summarizer_agent = create_summarizer_agent(self.llm)
+        
+        logs = state.get('logs', [])
+        logs_to_summarize = "\n".join(logs)
+        prompt = f"summarize the following logs:\n{logs_to_summarize}"
+
+        summary_text = ""
+        try:
+            response = summarizer_agent.invoke({"messages": [HumanMessage(content=prompt)]})
+            summary_text = str(response.get("messages", [])[-1].content)
+            logs.append("\n[Summarizer Node] Finished summarizing.")
+        except Exception as e:
+            summary_text = f"ERRO: Falha ao invocar o agente de resumo: {e}"
+            logs.append("\n[Summarizer Node] An error occurred whilst summarizing the logs")
+
+        return {"logs": logs, "summary": summary_text}
         
     def invoke(self, initial_message: str, thread_id: str):
         """Executa o grafo e imprime apenas o resultado final."""

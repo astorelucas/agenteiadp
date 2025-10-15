@@ -64,17 +64,20 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         3.  **feature_engineer**: If the task is to create new columns or features (like rolling averages, lags, etc.), delegate this to the feature engineering node.
         4. **retriever**: To solve problems (like code errors, bad results) or for strategic guidance, you must use the retriever to consult past experiences.
         5.  **plot**: If the inspection is done and you believe that visualizations will help in understanding the data better, delegate a task to the plotter agent.
-        6.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
+        6. **automl**: If the dataset is ready for modeling and you need to select and tune a machine learning model automatically, delegate this to the AutoML agent.
+        7.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
-        - "next": The next action, which must be either "inspect", "imputator", "retriever", "plot" or "END".
+        - "next": The next action, which must be either "inspect", "imputator", "retriever", "plot", "automl" or "END".
         - "msg": A clear and specific instruction for the next agent if the action is 'inspect' or 'plot'. For 'imputator', this should be a descriptive context of the dataset for it to make a decision.
         - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. This is important for the plotter agent to know.
+        - "test_size": (only if next is "automl") An integer indicating the size of the test set (e.g., 30).
+        - "target": (only if next is "automl") A string with the name of the target column in the dataset.
 
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
         IMPORTANT: If the 'Report from the previous step' contains an ERROR or indicates a FAILURE or if you see that it is in a LOOP, you MUST prioritize using the 'retriever' node to find a solution. DO NOT repeat the same failed instruction.
-
+        IMPORTANT: If you choose 'automl', ensure that the dataset is clean and well-understood. You must have already delegated tasks to inspect, impute, and plot as needed before reaching this step.
 
         Example 1 (Starting):
         {"output": "The analysis has just started. I will begin by getting an overview of the dataset.", "next": "inspect", "msg": "Summarize the dataset, checking for missing values and data types.", "is_before_dp": "True"}
@@ -88,6 +91,10 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         Example 4 (Using the Retriever Correctly again):
         {"output": "The inspect node raised an error. I will search the knowledge base for a solution.", "next": "retriever", "msg": "recursion limit error in inspect node", is_before_dp": "False"}
 
+        Example 6 (Preparing for AutoML):
+        {"output": "The dataset is now clean and well-understood. I will proceed to
+        prepare it for modeling by the AutoML agent.", "next": "automl", "msg": "", "is_before_dp": "False", "test_size": 30, "target": "temperature"}  
+        
         Example 5 (Ending):
         {"output": "The data has been inspected and imputed. The goal is met. The workflow will now end.", "next": "END", "msg": "Workflow complete.", is_before_dp": "False"}
         """,
@@ -232,43 +239,60 @@ def create_feedback_agent(llm) -> AgentExecutor:
 
 def create_automl_agent(df: pd.DataFrame, llm) -> AgentExecutor:
     """Cria o agente AutoML"""
-    return create_react_agent(
-        model=llm,
+    return create_pandas_dataframe_agent(
+        llm=llm,
         df=df,
         verbose=True,
-        agent_type="zero-shot-react-description",
         allow_dangerous_code=True,
         handle_parsing_errors=True,
-        prompt="""
-        You are an AutoMLAgent. Your role is to analyze the dataset and automatically select the best model and hyperparameters for the task.
+        extra_tools=[pycaret],
+        prefix="""
+        You are an AutoMLAgent that performs **time series forecasting** using the **PyCaret** tool.
+        
+        ---
 
-        Rules:
-        - Examine the dataset characteristics (e.g., size, feature types) and the task requirements (e.g., classification, regression).
-        - Collect the following inputs from the user:
-          1. `test_size`: The size of the test set (e.g., 30 rows).
-          2. `target`: The name of the target column in the dataset.
-        - Validate the inputs:
-          - Ensure `test_size` is a valid integer or float.
-          - Ensure `target` exists in the dataset columns.
-        - Select the most appropriate model from the available options.
-        - Optimize the model's hyperparameters using techniques like grid search or random search.
-        - Document the entire process, including the rationale for model selection and hyperparameter tuning.
+        ### Your Role
 
-        The input dataset is already loaded into a variable named `df`.
-        DO NOT try to redefine or recreate this `df` variable.
-        Your final response MUST BE a clear report of your findings, including the selected model and hyperparameters.
-        IMPORTANT: Use double quotes for all keys and string values in the JSON.
-        Your response MUST be in the following EXACT format:
+        - You must call the PyCaret tool with the correct parameters to perform time series forecasting.
+        - Carefully read the user's instructions and the context provided to determine the appropriate parameters for the tool
+        - The dataset `df` is already available in memory. Do NOT redefine it.
+        - You should only prepare the tool call and return JSON results.
+        - Do NOT simulate code execution or wrap JSON in quotes.
 
-        Output ONLY a valid JSON object:
-          {
-            "model": "selected_model_name",
-            "params": {
-              "param1": value1,
-              "param2": value2,
-              ...
-            }
-          }
-        """,
-        tools=[pycaret]
-    )
+        ---
+        
+        ### Tool Call Format (IMPORTANT)
+
+        The pycaret tool was created with the following signature:
+
+        @tool
+        def pycaret(df: pd.DataFrame, test_size: int, target: str, fh: int = 30) -> dict:
+
+        It accepts these parameters:
+        - df (pd.DataFrame): The input dataset.
+        - test_size (int): The size of the test set.
+        - target (str): The name of the target column.
+        - fh (int): The forecast horizon (default is 30).
+
+        ALWAYS call the tool with ALL parameters, based on the signature above.
+        Example tool call:
+        pycaret(df=df, test_size=30, target="temperature", fh=30)
+        
+        It returns a dictionary with keys: "real", "forecast", "best_model", "hyperparameters", and "logs".
+        
+        ---
+        
+        ### Expected Output
+        
+        After PyCaret completes, output ONLY the following JSON (no text or markdown):
+      
+        {{
+          "model": "best_model_name",
+          "params": {{
+            "param1": value1,
+            "param2": value2,
+            ...
+          }}
+        }}
+        """
+  )

@@ -22,7 +22,7 @@ from typing import List, Optional, Tuple, Dict, Any
 from abc import ABC, abstractmethod
 
 from pycaret.time_series import TSForecastingExperiment
-
+from pydantic import BaseModel, Field, StrictStr
 
 
 # abstract class 
@@ -551,12 +551,23 @@ def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> L
         
     return [plot_time_series, plot_scatter, plot_histograms, plot_heatmap, plot_boxplot, plot_scatter_matrix]
 
-def pycaret(dataset: pd.DataFrame, test_size: int, target: str, fh: int = 30) -> dict:
+class pycaretInputSchema(BaseModel):
+    df: pd.DataFrame = Field(..., description="DataFrame pandas válido")
+    test_size: int = Field(..., description="Tamanho do conjunto de teste (número inteiro positivo)")
+    target: StrictStr = Field(..., description="Nome da coluna alvo (string)")
+    fh: Optional[int] = Field(30, description="Horizonte de previsão (padrão é 30)")
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+@tool(args_schema=pycaretInputSchema)
+def pycaret(df: pd.DataFrame, test_size: int, target: str, fh: int = 30) -> dict:
     """
     Perform time series forecasting using PyCaret.
 
     Args:
-        dataset (pd.DataFrame): The input dataset.
+        df (pd.DataFrame): The input dataset.
         test_size (int): The size of the test set.
         target (str): The name of the target column.
         fh (int): The forecast horizon (default is 30).
@@ -567,22 +578,23 @@ def pycaret(dataset: pd.DataFrame, test_size: int, target: str, fh: int = 30) ->
     logs = []
 
     # Validate inputs
-    if not isinstance(dataset, pd.DataFrame):
+
+    if not isinstance(df, pd.DataFrame):
         return {"error": "Invalid dataset. Must be a pandas DataFrame.", "logs": logs}
 
     if not isinstance(test_size, int) or test_size <= 0:
         return {"error": "Invalid test_size. Must be a positive integer.", "logs": logs}
 
-    if target not in dataset.columns:
+    if target not in df.columns:
         return {"error": f"Target column '{target}' not found in dataset.", "logs": logs}
 
     try:
         # Reset index for PyCaret compatibility
-        dataset.index = range(0, dataset.shape[0])
+        df.index = range(0, df.shape[0])
 
         # Split dataset into train and test
-        train = dataset.head(dataset.shape[0] - test_size)
-        test = dataset.tail(test_size)
+        train = df.head(df.shape[0] - test_size)
+        test = df.tail(test_size)
 
         logs.append("Dataset split into train and test sets.")
 
@@ -612,7 +624,9 @@ def pycaret(dataset: pd.DataFrame, test_size: int, target: str, fh: int = 30) ->
             search_algorithm="random",
             tuner_verbose=True,
         )
+
         logs.append("Best model tuned successfully.")
+        print(best_model)
 
         # Forecast
         forecast = exp_auto.predict_model(best_model, fh=fh)
@@ -625,6 +639,8 @@ def pycaret(dataset: pd.DataFrame, test_size: int, target: str, fh: int = 30) ->
         return {
             "real": real,
             "forecast": forecast_values,
+            "best_model": str(best_model),
+            "hyperparameters": best_model.get_params(),
             "logs": logs
         }
 

@@ -194,18 +194,25 @@ class SupervisorNode(Node):
         next_step = plan.get("next", "END")
         msg_out = plan.get("msg", state.get("msg"))
         output = plan.get("output", "")
-        is_before_dp = plan.get("is_before_dp").lower() == "true"
+        is_before_dp = plan.get("is_before_dp")
         logs.append(f"Supervisor decision: {output}")
-        
-        return {
-            "next": next_step, 
-            "msg": msg_out, 
-            "logs": logs, 
+
+        return_state = {
+            "next": next_step,
+            "msg": msg_out,
+            "logs": logs,
             "subagents_report": None,
-            "main_goal": main_goal, 
+            "main_goal": main_goal,
             "is_before_dp": is_before_dp
         }
 
+        if next_step == "automl":
+            test_size = plan.get("test_size")
+            target = plan.get("target")
+            return_state = {**return_state, "test_size": test_size, "target": target}
+
+        return return_state
+    
 class RetrieverNode(Node):
     def __init__(self):
         super().__init__("retriever")
@@ -333,12 +340,12 @@ class AutoMLNode(Node):
         msg = state.get("msg", "")
 
         # Extract parameters from the state
-        test_size = state.get("test_size")
+        test_size = int(state.get("test_size"))
         target = state.get("target")
 
         # Validate inputs
-        if not isinstance(test_size, (int, float)) or test_size <= 0:
-            error_message = "Invalid test_size. Must be a positive integer or float."
+        if not isinstance(test_size, (int)) or test_size <= 0:
+            error_message = "Invalid test_size. Must be a positive integer."
             logs.append(f"[AutoML Node] {error_message}")
             return {"subagents_report": error_message, "logs": logs}
 
@@ -354,6 +361,7 @@ class AutoMLNode(Node):
                 f"target: {target}\n"
                 f"{msg}"
             )
+
             response = automl_agent.invoke({"input": input_message})
 
             # Parse the response

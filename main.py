@@ -24,7 +24,6 @@ def execute_pipeline():
     csv_path = "agentai/datasets/test.csv"
     plot_images_path = "agentai/images/plots"
 
-    # now the dataset is loadee *ONE* time here
     try:
         executor = WorkflowExecutor(csv_path=csv_path, plot_images_path=plot_images_path, llm=llm)
     except ValueError as e:

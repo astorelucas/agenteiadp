@@ -1,5 +1,6 @@
 from langchain_community.tools import WikipediaQueryRun
 from langchain_community.utilities import WikipediaAPIWrapper
+
 from langchain.tools import tool
 import pandas as pd
 import json
@@ -23,8 +24,6 @@ from abc import ABC, abstractmethod
 from agentai.rag import RAG
 
 from pycaret.time_series import TSForecastingExperiment
-from pydantic import BaseModel, Field, StrictStr
-
 
 # abstract class 
 class ImputationStrategy(ABC):
@@ -552,103 +551,135 @@ def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> L
         
     return [plot_time_series, plot_scatter, plot_histograms, plot_heatmap, plot_boxplot, plot_scatter_matrix]
 
-class pycaretInputSchema(BaseModel):
-    df: pd.DataFrame = Field(..., description="DataFrame pandas válido")
-    test_size: int = Field(..., description="Tamanho do conjunto de teste (número inteiro positivo)")
-    target: StrictStr = Field(..., description="Nome da coluna alvo (string)")
-    fh: Optional[int] = Field(30, description="Horizonte de previsão (padrão é 30)")
-
-    class Config:
-        arbitrary_types_allowed = True
-
-
-@tool(args_schema=pycaretInputSchema)
-def pycaret(df: pd.DataFrame, test_size: int, target: str, fh: int = 30) -> dict:
+def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> List:
+    """ Create AutoML tools with the given DataFrame
     """
-    Perform time series forecasting using PyCaret.
 
-    Args:
-        df (pd.DataFrame): The input dataset.
-        test_size (int): The size of the test set.
-        target (str): The name of the target column.
-        fh (int): The forecast horizon (default is 30).
+    @tool
+    def pycaret() -> dict:
+        """
+        Perform time series forecasting using PyCaret.
+        Args:
+            None
+        Returns:
+            dict: Contains real values, forecast values, best model info, and logs        
+        """
+        new_df = df.copy()
+        logs = []
 
-    Returns:
-        dict: A dictionary containing real values, forecast values, and logs.
-    """
-    logs = []
+        # ---------- Input Validation ----------
+        if not isinstance(new_df, pd.DataFrame):
+            error_message = "Input 'df' must be a pandas DataFrame."
+            logs.append(error_message)
+            return {"error": error_message, "logs": logs}
 
-    # Validate inputs
+        if new_df.empty:
+            error_message = "Dataset is empty."
+            logs.append(error_message)
+            return {"error": error_message, "logs": logs}
 
-    if not isinstance(df, pd.DataFrame):
-        return {"error": "Invalid dataset. Must be a pandas DataFrame.", "logs": logs}
+        if not isinstance(test_size, float) or not (0 < test_size < 1):
+            error_message = "Invalid 'test_size'. Must be a float between 0 and 1."
+            logs.append(error_message)
+            return {"error": error_message, "logs": logs}
 
-    if not isinstance(test_size, int) or test_size <= 0:
-        return {"error": "Invalid test_size. Must be a positive integer.", "logs": logs}
+        if not isinstance(target, str):
+            error_message = "Invalid 'target'. Must be a string."
+            logs.append(error_message)  
+            return {"error": error_message, "logs": logs}
+        elif target not in new_df.columns:
+            error_message = f"Target column '{target}' not found in dataset."
+            logs.append(error_message)
+            return {"error": error_message, "logs": logs}
+        
+        time_cols = (col for col in new_df.columns if 'time' in col.lower() or 'date' in col.lower())
 
-    if target not in df.columns:
-        return {"error": f"Target column '{target}' not found in dataset.", "logs": logs}
+        if not time_cols:
+            error_message = "No time-related column found in dataset."
+            logs.append(error_message)
+            return {"error": error_message, "logs": logs}
 
-    try:
-        # Reset index for PyCaret compatibility
-        df.index = range(0, df.shape[0])
+        time_col = next(time_cols)
+        logs.append(f"Using '{time_col}' as time index column.")
 
-        # Split dataset into train and test
-        train = df.head(df.shape[0] - test_size)
-        test = df.tail(test_size)
+        # ---------- Data Preparation ----------
+        try:
+            print(f"time_col before to_Datetime => {new_df[time_col].head()}")
+            new_df[time_col] = pd.to_datetime(new_df[time_col])
+            print(f"time_col after to_Datetime => {new_df[time_col].head()}")
+            new_df.set_index(time_col, inplace=True)
+            test_size_int = max(1, int(len(new_df) * test_size))
+            fh = test_size_int
 
-        logs.append("Dataset split into train and test sets.")
+            train = new_df.iloc[:-test_size_int]
+            test = new_df.iloc[-test_size_int:]
 
-        # Initialize PyCaret experiment
-        exp_auto = TSForecastingExperiment()
-        exp_auto.setup(
-            data=train,
-            target=target,
-            enforce_exogenous=True,
-            numeric_imputation_target="ffill",
-            numeric_imputation_exogenous="ffill",
-            session_id=42,
-        )
+            logs.append(f"Dataset split into train ({len(train)}) and test ({len(test)}) sets.")
 
-        logs.append("PyCaret experiment setup completed.")
+        except Exception as e:
+            error_message = f"Error during data preparation of pycaret tool: {e}"
+            logs.append(error_message)
+            return {"error": error_message, "logs": logs}
+        
+        # ---------- Pycaret Execution ----------
+        try:
+            # Initialize PyCaret experiment
+            exp_auto = TSForecastingExperiment()
+            exp_auto.setup(
+                data=train,
+                target=target,
+                enforce_exogenous=True,
+                numeric_imputation_target="ffill",
+                numeric_imputation_exogenous="ffill",
+                session_id=42,
+                verbose=False
+            )
 
-        # Compare models
-        best = exp_auto.compare_models(verbose=True)
-        logs.append(f"Best model selected: {best}")
+            logs.append("PyCaret experiment setup completed.")
 
-        # Tune the best model
-        best_model = exp_auto.tune_model(
-            best,
-            choose_better=True,
-            n_iter=50,
-            fold=3,
-            search_algorithm="random",
-            tuner_verbose=True,
-        )
+            # Compare models
+            best = exp_auto.compare_models(verbose=False)
+            if best in [None, [], {}]:
+                logs.append("compare_models() returned no valid model. Falling back to ARIMA.")
+                best = exp_auto.create_model("arima")
 
-        logs.append("Best model tuned successfully.")
-        print(best_model)
+            logs.append(f"Best model selected: {best}")
 
-        # Forecast
-        forecast = exp_auto.predict_model(best_model, fh=fh)
-        logs.append("Forecasting completed.")
+            # Tune the best model
+            best_model = exp_auto.tune_model(
+                best,
+                choose_better=True,
+                n_iter=50,
+                fold=3,
+                search_algorithm="random",
+                tuner_verbose=True,
+            )
 
-        # Return results
-        real = test[target].values
-        forecast_values = forecast.values.flatten()
+            logs.append("Best model tuned successfully.")
+            print(best_model)
 
-        return {
-            "real": real,
-            "forecast": forecast_values,
-            "best_model": str(best_model),
-            "hyperparameters": best_model.get_params(),
-            "logs": logs
-        }
+            # Forecast
+            forecast = exp_auto.predict_model(best_model, fh=fh)
+            logs.append("Forecasting completed.")
 
-    except Exception as e:
-        error_message = f"Error during PyCaret execution: {e}"
-        logs.append(error_message)
-        return {"error": error_message, "logs": logs}
+            # Return results
+            real = test[target].values
+            forecast_values = forecast.values.flatten()
+
+            return {
+                "real": real.tolist(),
+                "forecast": forecast_values.tolist(),
+                "best_model": str(best_model),
+                "params": best_model.get_params(),
+                "logs": logs
+            }
+
+        except Exception as e:
+            error_message = f"Error during PyCaret execution: {e}"
+            logs.append(error_message)
+            return {"error": error_message, "logs": logs}
+
+    return [pycaret]
 
 @tool
 def retrieve_context(query: str) -> dict:

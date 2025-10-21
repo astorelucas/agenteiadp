@@ -329,17 +329,16 @@ class AutoMLNode(Node):
         self.executor = executor
 
     def execute(self, state: AgentState) -> dict:
-        automl_agent = create_automl_agent(self.executor.df, self.executor.llm)
         logs = state.get("logs", [])
         msg = state.get("msg", "")
 
         # Extract parameters from the state
-        test_size = int(state.get("test_size"))
+        test_size = float(state.get("test_size"))
         target = state.get("target")
 
         # Validate inputs
-        if not isinstance(test_size, (int)) or test_size <= 0:
-            error_message = "Invalid test_size. Must be a positive integer."
+        if not isinstance(test_size, (float)) or not (0 < test_size < 1):
+            error_message = "Invalid test_size. Must be a float between 0 and 1."
             logs.append(f"[AutoML Node] {error_message}")
             return {"subagents_report": error_message, "logs": logs}
 
@@ -347,13 +346,14 @@ class AutoMLNode(Node):
             error_message = f"Target column '{target}' not found in the dataset."
             logs.append(f"[AutoML Node] {error_message}")
             return {"subagents_report": error_message, "logs": logs}
+        
 
+        automl_agent = create_automl_agent(self.executor.df, self.executor.llm, target, test_size)
+    
         try:
             # Invoke the AutoML agent
             input_message = (
-                f"test_size: {test_size}\n"
-                f"target: {target}\n"
-                f"{msg}"
+                f"Based on the following instruction: '{msg}', select the best time series forecasting model and its hyperparameters using PyCaret.\n"
             )
 
             response = automl_agent.invoke({"input": input_message})

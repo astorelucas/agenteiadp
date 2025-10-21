@@ -11,7 +11,7 @@ from agentai.tools import (
     inspection_tools,
     make_plot_tools,
     retrieve_context,
-    pycaret
+    make_automl_tools
 )
 
 # load_dotenv()
@@ -74,7 +74,7 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         - "next": The next action, which must be either "inspect", "imputator", "feature_engineer", "retriever", "plot", "automl" or "END".
         - "msg": A clear and specific instruction for the next agent. Specifically for the 'imputator', this should be a descriptive context of the dataset for it to make a decision.
         - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. This is important for the plotter agent to know.
-        - "test_size": (only if next is "automl") An integer indicating the size of the test set (e.g., 30).
+        - "test_size": (only if next is "automl") A float between 0 and 1 indicating the size of the test set (e.g., 0.2).
         - "target": (only if next is "automl") A string with the name of the target column in the dataset.
 
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
@@ -95,10 +95,10 @@ def create_supervisor_agent(llm) -> AgentExecutor:
 
         Example 5 (Preparing for AutoML):
         {"output": "The dataset is now clean and well-understood. I will proceed to
-        prepare it for modeling by the AutoML agent.", "next": "automl", "msg": "", "is_before_dp": "False", "test_size": 30, "target": "temperature"}  
+        prepare it for modeling by the AutoML agent.", "next": "automl", "msg": "", "is_before_dp": "False", "test_size": 0.2, "target": "temperature"}  
 
         Example 6 (Ending):
-        {"output": "The data has been inspected and imputed. The goal is met. The workflow will now end.", "next": "END", "msg": "Workflow complete.", is_before_dp": "False"}
+        {"output": "The data has been inspected, imputed, visualized, and modeled. The analysis is complete.", "next": "END", "msg": "Workflow complete.", "is_before_dp": "False"}
         """,
     )
 
@@ -269,62 +269,41 @@ def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
     )
 
 
-def create_automl_agent(df: pd.DataFrame, llm) -> AgentExecutor:
-    """Cria o agente AutoML"""
+def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float) -> AgentExecutor:
+    """
+    Cria o agente AutoML
+    """
+    automl_tools = make_automl_tools(df, target, test_size)
+
     return create_pandas_dataframe_agent(
         llm=llm,
         df=df,
         verbose=True,
         allow_dangerous_code=True,
         handle_parsing_errors=True,
-        extra_tools=[pycaret],
+        extra_tools=automl_tools,
         prefix="""
-        You are an AutoMLAgent that performs **time series forecasting** using the **PyCaret** tool.
-        
-        ---
+        You are an AutoML Agent specialized in time series forecasting using PyCaret.
 
-        ### Your Role
+        ### Instructions:
+        1. The dataset is already loaded in memory - DO NOT try to load or access it directly
+        2. Use the 'pycaret' tool to perform forecasting tasks. DO NOT try to pass parameters manually, the tool will handle that for you.
+        3. Follow the user's instructions carefully to select, train, and evaluate models
+        4. After receiving results, format them as JSON
 
-        - You must call the PyCaret tool with the correct parameters to perform time series forecasting.
-        - Carefully read the user's instructions and the context provided to determine the appropriate parameters for the tool
-        - The dataset `df` is already available in memory. Do NOT redefine it.
-        - You should only prepare the tool call and return JSON results.
-        - Do NOT simulate code execution or wrap JSON in quotes.
-
-        ---
-        
-        ### Tool Call Format (IMPORTANT)
-
-        The pycaret tool was created with the following signature:
-
-        @tool
-        def pycaret(df: pd.DataFrame, test_size: int, target: str, fh: int = 30) -> dict:
-
-        It accepts these parameters:
-        - df (pd.DataFrame): The input dataset.
-        - test_size (int): The size of the test set.
-        - target (str): The name of the target column.
-        - fh (int): The forecast horizon (default is 30).
-
-        ALWAYS call the tool with ALL parameters, based on the signature above.
-        Example tool call:
-        pycaret(df=df, test_size=30, target="temperature", fh=30)
-        
-        It returns a dictionary with keys: "real", "forecast", "best_model", "hyperparameters", and "logs".
-        
-        ---
-        
-        ### Expected Output
-        
-        After PyCaret completes, output ONLY the following JSON (no text or markdown):
-      
+        ### Output Format:
+        Return ONLY valid JSON (no markdown, no code blocks):
         {{
-          "model": "best_model_name",
-          "params": {{
-            "param1": value1,
-            "param2": value2,
-            ...
-          }}
+            "model": "model_name",
+            "params": {{
+                "param1": value1,
+                "param2": value2
+            }}
         }}
+
+        ### Important:
+        - DO NOT execute Python code directly
+        - DO NOT try to access the dataframe 'df'
+        - ONLY use the pycaret tools provided
         """
   )

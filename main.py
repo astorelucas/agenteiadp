@@ -42,8 +42,8 @@ def execute_pipeline():
     # unique ID
     thread_id = str(uuid4())
 
-    initial_prompt = "Perform a complete exploratory data analysis on the quality of this dataset. Start with a general overview, then delve into the most important points you deem necessary, such as missing values, descriptive statistics, and potential outliers. Also create features."
-    # initial_prompt = "just tell me some random info about the dataset"
+    #initial_prompt = "Perform a complete exploratory data analysis on the quality of this dataset. Start with a general overview, then delve into the most important points you deem necessary, such as missing values, descriptive statistics, and potential outliers. Finally, perform a forecasting task for the 'temperature' column using appropriate models and techniques. Provide visualizations where necessary to support your analysis."
+    initial_prompt = "just check the missing value in the dataset and try to fill it using appropriate techniques. After that, perform a forecasting task for the 'temperature' column using appropriate models and techniques."
     executor.invoke(initial_message=initial_prompt, thread_id=thread_id)
 
 if __name__ == "__main__":

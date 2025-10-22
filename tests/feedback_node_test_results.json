@@ -1,0 +1,218 @@
+[
+  {
+    "test_name": "erro_resolvido",
+    "passed": false,
+    "score": 0.0,
+    "execution_time": 1.7118890285491943,
+    "json_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "✗ Nenhum JSON encontrado no output",
+      "decision": null
+    },
+    "logic_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "store_decision": null,
+      "insight_provided": false
+    },
+    "insight_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "has_insight": false
+    },
+    "agent_output": "\n[Feedback Node] Stored new insight: Column name errors can be resolved by verifying column names against the dataset schema.",
+    "expected_store": true
+  },
+  {
+    "test_name": "workflow_trivial",
+    "passed": false,
+    "score": 0.0,
+    "execution_time": 1.2100293636322021,
+    "json_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "✗ Nenhum JSON encontrado no output",
+      "decision": null
+    },
+    "logic_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "store_decision": null,
+      "insight_provided": false
+    },
+    "insight_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "has_insight": false
+    },
+    "agent_output": "\n[Feedback Node] No relevant insight to store. Note: This is not an error.",
+    "expected_store": false
+  },
+  {
+    "test_name": "feature_engineering_sucesso",
+    "passed": false,
+    "score": 0.0,
+    "execution_time": 1.4819426536560059,
+    "json_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "✗ Nenhum JSON encontrado no output",
+      "decision": null
+    },
+    "logic_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "store_decision": null,
+      "insight_provided": false
+    },
+    "insight_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "has_insight": false
+    },
+    "agent_output": "\n[Feedback Node] Stored new insight: Creating rolling average and lag features improved the analysis.",
+    "expected_store": true
+  },
+  {
+    "test_name": "erros_nao_resolvidos",
+    "passed": false,
+    "score": 0.0,
+    "execution_time": 1.2592854499816895,
+    "json_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "✗ Nenhum JSON encontrado no output",
+      "decision": null
+    },
+    "logic_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "store_decision": null,
+      "insight_provided": false
+    },
+    "insight_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "has_insight": false
+    },
+    "agent_output": "\n[Feedback Node] No relevant insight to store. Note: This is not an error.",
+    "expected_store": false
+  },
+  {
+    "test_name": "imputacao_eficaz",
+    "passed": false,
+    "score": 0.0,
+    "execution_time": 1.6455135345458984,
+    "json_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "✗ Nenhum JSON encontrado no output",
+      "decision": null
+    },
+    "logic_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "store_decision": null,
+      "insight_provided": false
+    },
+    "insight_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "has_insight": false
+    },
+    "agent_output": "\n[Feedback Node] Stored new insight: For time-series datasets, MICE imputation with n_estimators=10 performed well.",
+    "expected_store": true
+  },
+  {
+    "test_name": "workflow_complexo_rotineiro",
+    "passed": false,
+    "score": 0.0,
+    "execution_time": 1.217759609222412,
+    "json_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "✗ Nenhum JSON encontrado no output",
+      "decision": null
+    },
+    "logic_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "store_decision": null,
+      "insight_provided": false
+    },
+    "insight_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "has_insight": false
+    },
+    "agent_output": "\n[Feedback Node] No relevant insight to store. Note: This is not an error.",
+    "expected_store": null
+  },
+  {
+    "test_name": "descoberta_padrao",
+    "passed": false,
+    "score": 0.0,
+    "execution_time": 2.068462610244751,
+    "json_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "✗ Nenhum JSON encontrado no output",
+      "decision": null
+    },
+    "logic_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "store_decision": null,
+      "insight_provided": false
+    },
+    "insight_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "has_insight": false
+    },
+    "agent_output": "\n[Feedback Node] Stored new insight: For datasets with temporal data, creating an hour-of-day feature can significantly improve model predictions when a 24-hour cyclical pattern is present.",
+    "expected_store": true
+  },
+  {
+    "test_name": "tentativa_erro_sucesso",
+    "passed": false,
+    "score": 0.0,
+    "execution_time": 2.3478164672851562,
+    "json_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "✗ Nenhum JSON encontrado no output",
+      "decision": null
+    },
+    "logic_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "store_decision": null,
+      "insight_provided": false
+    },
+    "insight_validation": {
+      "passed": false,
+      "score": 0.0,
+      "reason": "Decisão não disponível",
+      "has_insight": false
+    },
+    "agent_output": "\n[Feedback Node] Stored new insight: Time series visualization errors due to non-datetime format can be resolved by converting the time column to datetime format.",
+    "expected_store": true
+  }
+]

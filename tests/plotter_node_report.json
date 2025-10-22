@@ -1,0 +1,246 @@
+{
+  "summary": {
+    "total_tests": 8,
+    "successful": 8,
+    "failed": 0,
+    "success_rate": "100.0%",
+    "average_time": "7.69s",
+    "total_files_created": 10
+  },
+  "by_category": {
+    "BasicPlots": {
+      "total": 3,
+      "success": 3,
+      "rate": "100.0%"
+    },
+    "Correlation": {
+      "total": 1,
+      "success": 1,
+      "rate": "100.0%"
+    },
+    "SpecificInstructions": {
+      "total": 2,
+      "success": 2,
+      "rate": "100.0%"
+    },
+    "DirectoryHandling": {
+      "total": 2,
+      "success": 2,
+      "rate": "100.0%"
+    }
+  },
+  "details": [
+    {
+      "test_name": "time_series_basic",
+      "test_category": "BasicPlots",
+      "success": true,
+      "execution_time": 5.415704250335693,
+      "instruction": "Create a time series plot showing temperature over time.",
+      "files_created": [
+        "time_series_plots.png"
+      ],
+      "validation_results": {
+        "files_created": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ 1 arquivo(s) PNG criado(s)",
+          "files_found": [
+            "time_series_plots.png"
+          ]
+        },
+        "no_errors": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Nenhum erro no output"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "scatter_temp_humidity",
+      "test_category": "BasicPlots",
+      "success": true,
+      "execution_time": 4.107555627822876,
+      "instruction": "Create a scatter plot showing the relationship between temperature and humidity.",
+      "files_created": [
+        "scatter_temperature_vs_humidity.png"
+      ],
+      "validation_results": {
+        "files_created": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ 1 arquivo(s) PNG criado(s)",
+          "files_found": [
+            "scatter_temperature_vs_humidity.png"
+          ]
+        },
+        "no_errors": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Nenhum erro no output"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "histogram_distribution",
+      "test_category": "BasicPlots",
+      "success": true,
+      "execution_time": 5.370012044906616,
+      "instruction": "Create histograms to show the distribution of all numeric variables.",
+      "files_created": [
+        "histogram_pressure.png"
+      ],
+      "validation_results": {
+        "files_created": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ 1 arquivo(s) PNG criado(s)",
+          "files_found": [
+            "histogram_pressure.png"
+          ]
+        },
+        "no_errors": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Nenhum erro no output"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "correlation_heatmap",
+      "test_category": "Correlation",
+      "success": true,
+      "execution_time": 4.968113660812378,
+      "instruction": "Create a correlation heatmap for all sensors.",
+      "files_created": [
+        "heatmap.png"
+      ],
+      "validation_results": {
+        "files_created": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ 1 arquivo(s) PNG criado(s)",
+          "files_found": [
+            "heatmap.png"
+          ]
+        },
+        "no_errors": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Nenhum erro no output"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "specific_column_temp",
+      "test_category": "SpecificInstructions",
+      "success": true,
+      "execution_time": 5.997061729431152,
+      "instruction": "Plot only the temperature column over time.",
+      "files_created": [
+        "time_series_plots.png"
+      ],
+      "validation_results": {
+        "files_created": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ 1 arquivo(s) PNG criado(s)",
+          "files_found": [
+            "time_series_plots.png"
+          ]
+        },
+        "no_errors": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Nenhum erro no output"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "multiple_plots_request",
+      "test_category": "SpecificInstructions",
+      "success": true,
+      "execution_time": 18.229037761688232,
+      "instruction": "Create multiple plots: time series for temperature, scatter for temp vs humidity, and a histogram.",
+      "files_created": [
+        "histogram_temperature.png",
+        "scatter_temperature_vs_humidity.png",
+        "time_series_plots.png"
+      ],
+      "validation_results": {
+        "files_created": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ 3 arquivo(s) PNG criado(s)",
+          "files_found": [
+            "histogram_temperature.png",
+            "scatter_temperature_vs_humidity.png",
+            "time_series_plots.png"
+          ]
+        },
+        "no_errors": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Nenhum erro no output"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "before_dp_directory",
+      "test_category": "DirectoryHandling",
+      "success": true,
+      "execution_time": 7.603547096252441,
+      "instruction": "Create a simple time series plot.",
+      "files_created": [
+        "time_series_plots.png"
+      ],
+      "validation_results": {
+        "files_created": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ 1 arquivo(s) PNG criado(s)",
+          "files_found": [
+            "time_series_plots.png"
+          ]
+        },
+        "no_errors": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Nenhum erro no output"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "after_dp_directory",
+      "test_category": "DirectoryHandling",
+      "success": true,
+      "execution_time": 9.792138814926147,
+      "instruction": "Create a simple time series plot.",
+      "files_created": [
+        "time_series_plots.png"
+      ],
+      "validation_results": {
+        "files_created": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ 1 arquivo(s) PNG criado(s)",
+          "files_found": [
+            "time_series_plots.png"
+          ]
+        },
+        "no_errors": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Nenhum erro no output"
+        }
+      },
+      "error_message": ""
+    }
+  ]
+}

@@ -1,0 +1,202 @@
+{
+  "summary": {
+    "total_tests": 8,
+    "successful": 0,
+    "failed": 8,
+    "success_rate": "0.0%",
+    "average_time": "0.00s",
+    "average_output_length": 68
+  },
+  "by_category": {
+    "MissingData": {
+      "total": 2,
+      "success": 0,
+      "rate": "0.0%"
+    },
+    "FeatureEngineering": {
+      "total": 2,
+      "success": 0,
+      "rate": "0.0%"
+    },
+    "ErrorHandling": {
+      "total": 2,
+      "success": 0,
+      "rate": "0.0%"
+    },
+    "InvalidQueries": {
+      "total": 2,
+      "success": 0,
+      "rate": "0.0%"
+    }
+  },
+  "details": [
+    {
+      "test_name": "missing_data_general",
+      "test_category": "MissingData",
+      "success": false,
+      "execution_time": 0.0,
+      "query": "How to handle missing data in time series IoT datasets?",
+      "output_length": 68,
+      "validation_results": {
+        "output_exists": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Retornou 68 caracteres"
+        },
+        "relevance": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Baixa relevância: 0.0%"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "imputation_methods",
+      "test_category": "MissingData",
+      "success": false,
+      "execution_time": 0.0,
+      "query": "What are the best imputation methods for sensor data with local patterns?",
+      "output_length": 68,
+      "validation_results": {
+        "output_exists": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Retornou 68 caracteres"
+        },
+        "relevance": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Baixa relevância: 0.0%"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "feature_engineering_iot",
+      "test_category": "FeatureEngineering",
+      "success": false,
+      "execution_time": 0.0,
+      "query": "Best practices for feature engineering in IoT time series data",
+      "output_length": 68,
+      "validation_results": {
+        "output_exists": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Retornou 68 caracteres"
+        },
+        "relevance": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Baixa relevância: 0.0%"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "rolling_average_how_to",
+      "test_category": "FeatureEngineering",
+      "success": false,
+      "execution_time": 0.0,
+      "query": "How to create rolling average features for temperature sensor data?",
+      "output_length": 68,
+      "validation_results": {
+        "output_exists": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Retornou 68 caracteres"
+        },
+        "relevance": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Baixa relevância: 0.0%"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "error_resolution",
+      "test_category": "ErrorHandling",
+      "success": false,
+      "execution_time": 0.0,
+      "query": "Agent failed with NameError - how to resolve import errors in pandas code?",
+      "output_length": 68,
+      "validation_results": {
+        "output_exists": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Retornou 68 caracteres"
+        },
+        "relevance": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Baixa relevância: 0.0%"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "numpy_import_error",
+      "test_category": "ErrorHandling",
+      "success": false,
+      "execution_time": 0.0033648014068603516,
+      "query": "NameError: name 'np' is not defined - how to fix?",
+      "output_length": 68,
+      "validation_results": {
+        "output_exists": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Retornou 68 caracteres"
+        },
+        "relevance": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Baixa relevância: 0.0%"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "empty_query",
+      "test_category": "InvalidQueries",
+      "success": false,
+      "execution_time": 0.0013175010681152344,
+      "query": "",
+      "output_length": 68,
+      "validation_results": {
+        "output_exists": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Retornou 68 caracteres"
+        },
+        "relevance": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "Query ou output vazio"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "vague_query",
+      "test_category": "InvalidQueries",
+      "success": false,
+      "execution_time": 0.005311012268066406,
+      "query": "help",
+      "output_length": 68,
+      "validation_results": {
+        "output_exists": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Retornou 68 caracteres"
+        },
+        "relevance": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Baixa relevância: 0.0%"
+        }
+      },
+      "error_message": ""
+    }
+  ]
+}

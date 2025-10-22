@@ -1,0 +1,200 @@
+{
+  "summary": {
+    "total_tests": 6,
+    "successful": 3,
+    "failed": 3,
+    "success_rate": "50.0%",
+    "average_time": "4.59s"
+  },
+  "by_category": {
+    "SensorLocal": {
+      "total": 2,
+      "success": 0,
+      "rate": "0.0%"
+    },
+    "ComplexRelations": {
+      "total": 1,
+      "success": 1,
+      "rate": "100.0%"
+    },
+    "SmallDataset": {
+      "total": 1,
+      "success": 1,
+      "rate": "100.0%"
+    },
+    "MissingRate": {
+      "total": 2,
+      "success": 1,
+      "rate": "50.0%"
+    }
+  },
+  "methods_chosen": {
+    "knn": 3,
+    "mice": 2,
+    "gp": 1
+  },
+  "details": [
+    {
+      "test_name": "sensor_random_20pct",
+      "test_category": "SensorLocal",
+      "success": false,
+      "execution_time": 4.017660140991211,
+      "dataset_characteristics": {
+        "n_rows": 200,
+        "n_columns": 4,
+        "missing_count": 120,
+        "missing_rate": 0.15,
+        "pattern": "sensorlocal"
+      },
+      "chosen_method": "knn",
+      "chosen_params": {},
+      "validation_result": {
+        "score": 0.3333333333333333,
+        "details": [
+          "✓ Método 'knn' é válido",
+          "⚠ Nenhum parâmetro fornecido (usando defaults)",
+          "⚠ KNN pode não ser ideal para este cenário"
+        ],
+        "passed": false,
+        "chosen_method": "knn",
+        "params": {}
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "sensor_temporal_15pct",
+      "test_category": "SensorLocal",
+      "success": false,
+      "execution_time": 3.700803756713867,
+      "dataset_characteristics": {
+        "n_rows": 200,
+        "n_columns": 4,
+        "missing_count": 93,
+        "missing_rate": 0.11625,
+        "pattern": "sensorlocal"
+      },
+      "chosen_method": "knn",
+      "chosen_params": {},
+      "validation_result": {
+        "score": 0.3333333333333333,
+        "details": [
+          "✓ Método 'knn' é válido",
+          "⚠ Nenhum parâmetro fornecido (usando defaults)",
+          "⚠ KNN pode não ser ideal para este cenário"
+        ],
+        "passed": false,
+        "chosen_method": "knn",
+        "params": {}
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "complex_relationships",
+      "test_category": "ComplexRelations",
+      "success": true,
+      "execution_time": 7.31005334854126,
+      "dataset_characteristics": {
+        "n_rows": 200,
+        "n_columns": 5,
+        "missing_count": 200,
+        "missing_rate": 0.2,
+        "pattern": "complexrelations"
+      },
+      "chosen_method": "mice",
+      "chosen_params": {},
+      "validation_result": {
+        "score": 0.6666666666666666,
+        "details": [
+          "✓ Método 'mice' é válido",
+          "⚠ Nenhum parâmetro fornecido (usando defaults)",
+          "✓ MICE apropriado: robusto para relações complexas"
+        ],
+        "passed": true,
+        "chosen_method": "mice",
+        "params": {}
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "small_dataset_50_rows",
+      "test_category": "SmallDataset",
+      "success": true,
+      "execution_time": 3.5910699367523193,
+      "dataset_characteristics": {
+        "n_rows": 50,
+        "n_columns": 3,
+        "missing_count": 30,
+        "missing_rate": 0.2,
+        "pattern": "smalldataset"
+      },
+      "chosen_method": "gp",
+      "chosen_params": {},
+      "validation_result": {
+        "score": 0.6666666666666666,
+        "details": [
+          "✓ Método 'gp' é válido",
+          "⚠ Nenhum parâmetro fornecido (usando defaults)",
+          "✓ GP apropriado: dataset pequeno, boa para incerteza"
+        ],
+        "passed": true,
+        "chosen_method": "gp",
+        "params": {}
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "light_missing_10pct",
+      "test_category": "MissingRate",
+      "success": false,
+      "execution_time": 3.4372403621673584,
+      "dataset_characteristics": {
+        "n_rows": 200,
+        "n_columns": 4,
+        "missing_count": 60,
+        "missing_rate": 0.075,
+        "pattern": "missingrate"
+      },
+      "chosen_method": "knn",
+      "chosen_params": {},
+      "validation_result": {
+        "score": 0.3333333333333333,
+        "details": [
+          "✓ Método 'knn' é válido",
+          "⚠ Nenhum parâmetro fornecido (usando defaults)",
+          "⚠ KNN pode não ser ideal para este cenário"
+        ],
+        "passed": false,
+        "chosen_method": "knn",
+        "params": {}
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "heavy_missing_50pct",
+      "test_category": "MissingRate",
+      "success": true,
+      "execution_time": 5.457331657409668,
+      "dataset_characteristics": {
+        "n_rows": 200,
+        "n_columns": 4,
+        "missing_count": 300,
+        "missing_rate": 0.375,
+        "pattern": "missingrate"
+      },
+      "chosen_method": "mice",
+      "chosen_params": {},
+      "validation_result": {
+        "score": 0.6666666666666666,
+        "details": [
+          "✓ Método 'mice' é válido",
+          "⚠ Nenhum parâmetro fornecido (usando defaults)",
+          "✓ MICE apropriado: robusto para relações complexas"
+        ],
+        "passed": true,
+        "chosen_method": "mice",
+        "params": {}
+      },
+      "error_message": ""
+    }
+  ]
+}

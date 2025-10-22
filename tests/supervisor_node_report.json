@@ -1,0 +1,170 @@
+{
+  "summary": {
+    "total_tests": 5,
+    "successful": 0,
+    "failed": 5,
+    "success_rate": "0.0%",
+    "average_time": "2.75s"
+  },
+  "by_category": {
+    "InitialDecision": {
+      "total": 1,
+      "success": 0,
+      "rate": "0.0%"
+    },
+    "ImputationDelegation": {
+      "total": 1,
+      "success": 0,
+      "rate": "0.0%"
+    },
+    "FeatureDelegation": {
+      "total": 1,
+      "success": 0,
+      "rate": "0.0%"
+    },
+    "ErrorRecovery": {
+      "total": 1,
+      "success": 0,
+      "rate": "0.0%"
+    },
+    "Finalization": {
+      "total": 1,
+      "success": 0,
+      "rate": "0.0%"
+    }
+  },
+  "decisions_made": {
+    "inspect": 1,
+    "imputator": 1,
+    "feature_engineer": 1,
+    "retriever": 1,
+    "END": 1
+  },
+  "details": [
+    {
+      "test_name": "initial_workflow_start",
+      "test_category": "InitialDecision",
+      "success": false,
+      "execution_time": 2.9701449871063232,
+      "scenario_description": "Início do workflow - deve começar com 'inspect' ou 'plot'",
+      "decision_made": {
+        "next": "inspect",
+        "msg": "Summarize the dataset, checking for missing values and data types.",
+        "output": "No JSON in logs"
+      },
+      "validation_results": {
+        "validator_wrapper": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Início correto com 'inspect'"
+        },
+        "<lambda>": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Campos faltantes: ['is_before_dp']"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "delegate_to_imputator_after_missing",
+      "test_category": "ImputationDelegation",
+      "success": false,
+      "execution_time": 3.0405380725860596,
+      "scenario_description": "Após detectar missing data - deve ir para 'imputator'",
+      "decision_made": {
+        "next": "imputator",
+        "msg": "The initial analysis found 20 missing values (20%) in the 'temperature' column. The data appears to be time-series sensor data.",
+        "output": "No JSON in logs"
+      },
+      "validation_results": {
+        "validator_wrapper": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Corretamente delegou para imputator após detectar missing"
+        },
+        "<lambda>": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Campos faltantes: ['is_before_dp']"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "delegate_feature_engineering",
+      "test_category": "FeatureDelegation",
+      "success": false,
+      "execution_time": 2.442338228225708,
+      "scenario_description": "Solicitação de feature - deve ir para 'feature_engineer'",
+      "decision_made": {
+        "next": "feature_engineer",
+        "msg": "Create a 3-hour rolling average for the temperature column.",
+        "output": "No JSON in logs"
+      },
+      "validation_results": {
+        "validator_wrapper": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Corretamente delegou feature engineering"
+        },
+        "<lambda>": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Campos faltantes: ['is_before_dp']"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "error_recovery_use_retriever",
+      "test_category": "ErrorRecovery",
+      "success": false,
+      "execution_time": 2.6459267139434814,
+      "scenario_description": "Após erro - deve usar 'retriever' para buscar solução",
+      "decision_made": {
+        "next": "retriever",
+        "msg": "The pandas node encountered a NameError: numpy not imported. Find a solution to this error.",
+        "output": "No JSON in logs"
+      },
+      "validation_results": {
+        "validator_wrapper": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Corretamente usou retriever para resolver erro"
+        },
+        "<lambda>": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Campos faltantes: ['is_before_dp']"
+        }
+      },
+      "error_message": ""
+    },
+    {
+      "test_name": "end_after_complete_analysis",
+      "test_category": "Finalization",
+      "success": false,
+      "execution_time": 2.641127586364746,
+      "scenario_description": "Análise completa - deve finalizar com 'END'",
+      "decision_made": {
+        "next": "END",
+        "msg": "Exploratory data analysis is complete. No further steps required.",
+        "output": "No JSON in logs"
+      },
+      "validation_results": {
+        "validator_end": {
+          "passed": true,
+          "score": 1.0,
+          "reason": "✓ Corretamente finalizou após completar análise"
+        },
+        "<lambda>": {
+          "passed": false,
+          "score": 0.0,
+          "reason": "✗ Campos faltantes: ['is_before_dp']"
+        }
+      },
+      "error_message": ""
+    }
+  ]
+}

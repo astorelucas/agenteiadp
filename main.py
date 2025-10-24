@@ -4,6 +4,12 @@ import sys
 import os
 from uuid import uuid4
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
 from agentai.workflow import WorkflowExecutor
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -17,7 +23,7 @@ def load_env_variables():
 
 def execute_pipeline():
     load_env_variables()
-    llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct")
+    llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct", max_tokens=500)
     
     print("*** Iniciando o pipeline ***\n\n")
 

@@ -59,6 +59,10 @@ class FeatureEngineeringNode(Node):
         logs = state.get("logs", [])
         msg = state.get("msg", "")
         df = getattr(self.executor, "df", None)
+        
+        thought_collector = AgentThoughtCollector()
+
+
 
         if df is None:
             error_report = "[FeatureEngineeringNode] No DataFrame available on executor."
@@ -67,19 +71,26 @@ class FeatureEngineeringNode(Node):
 
         try:
             agent = create_feature_engineering_agent(df, self.executor.llm)
-            response = agent.invoke({"input": msg})
-            fe_report = response.get("output", "") or str(response)
+            response = agent.invoke({"input": msg}, config={"callbacks": [thought_collector]})
+            report = response.get("output", "") or str(response)
 
-            # Pega o df atualizado
             self.executor.df = df  
 
-            logs.append(f"[FeatureEngineeringNode] Executed instruction: '{msg}' -> {fe_report}")
-            return {"subagents_report": fe_report, "logs": logs}
+            full_thought_process = thought_collector.thoughts
+            
+            complete_report = (
+                f"{full_thought_process}\n"
+                f"FINAL REPORT:{report}"
+            )
+
+            logs.append(f"[FeatureEngineeringNode] {complete_report}")
+            return {"subagents_report": complete_report, "logs": logs}
 
         except Exception as e:
             error_report = f"[FeatureEngineeringNode] Error: {e}"
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
+
 
 
 class PandasNode(Node):

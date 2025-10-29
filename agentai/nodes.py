@@ -98,6 +98,8 @@ class PandasNode(Node):
     def __init__(self, executor):
         super().__init__("inspect")
         self.executor = executor
+        agent = create_pandas_agent(self.executor.df, self.executor.llm)
+
 
     def execute(self, state: AgentState) -> dict:
         msg = state.get("msg", "")
@@ -143,13 +145,13 @@ class ImputatorNode(Node):
     def __init__(self, executor):
         super().__init__("imputator")
         self.executor = executor
-
+        self.imputator_agent = create_imputator_agent(executor.llm)
+        
     def execute(self, state: AgentState) -> dict:
         context = state.get("msg", "")
         logs = state.get("logs", [])
         
-        imputator_agent = create_imputator_agent(self.executor.llm)
-        response = imputator_agent.invoke({"messages": [HumanMessage(content=context)]})
+        response = self.imputator_agent.invoke({"messages": [HumanMessage(content=context)]})
         raw_output = str(response.get("messages", [])[-1].content)
         json_str_match = re.search(r'\{.*\}', raw_output, re.DOTALL)
 
@@ -184,9 +186,9 @@ class SupervisorNode(Node):
     def __init__(self, executor):
         super().__init__("supervisor")
         self.executor = executor
+        self.supervisor_agent = create_supervisor_agent(executor.llm)
 
     def execute(self, state: AgentState) -> dict:
-        supervisor_agent = create_supervisor_agent(self.executor.llm)
 
         previous_report = state.get("subagents_report")
 
@@ -201,7 +203,7 @@ class SupervisorNode(Node):
         if previous_report:
             input_message += f"Report from the previous step:\n{previous_report}"
 
-        response = supervisor_agent.invoke({"messages": [HumanMessage(content=input_message)]})
+        response = self.supervisor_agent.invoke({"messages": [HumanMessage(content=input_message)]})
 
         logs = state.get("logs", [])
         raw_output = str(response.get("messages", [])[-1].content)
@@ -220,7 +222,6 @@ class SupervisorNode(Node):
         next_step = plan.get("next", "END")
         msg_out = plan.get("msg", state.get("msg"))
         output = plan.get("output", "")
-        is_before_dp = plan.get("is_before_dp").lower() == "true"
         logs.append(f"\n[Supervisor Node] Decision made: {output}")
         
         return_state = {
@@ -228,8 +229,7 @@ class SupervisorNode(Node):
             "msg": msg_out,
             "logs": logs,
             "subagents_report": None,
-            "main_goal": main_goal,
-            "is_before_dp": is_before_dp
+            "main_goal": main_goal
         }
 
         if next_step == "automl":
@@ -262,11 +262,11 @@ class PlotterNode(Node):
     def __init__(self, executor):
         super().__init__("plot")
         self.executor = executor
+        self.agent = create_plotter_agent(self.executor.df, self.executor.images_path, self.executor.llm)
 
     def execute(self, state: AgentState) -> dict:
         msg = state.get("msg", "").lower()
         logs = state.get("logs", [])
-        is_before_dp = state.get('is_before_dp')
 
         input_message = (
             f"Create plots to help analyze the dataset based on the following instruction: '{msg}'.\n"
@@ -276,8 +276,7 @@ class PlotterNode(Node):
         report = f"\n[Plotter Node] "
 
         try:
-            agent = create_plotter_agent(self.executor.df, self.executor.images_path, self.executor.llm, is_before_dp=is_before_dp)
-            response = agent.invoke({"input": input_message})
+            response = self.agent.invoke({"input": input_message})
             report += response.get("output", "") or str(response)
         except Exception as e:
             report += f"Time series agent failed to execute instruction. Error: {e}"
@@ -291,7 +290,7 @@ class FeedbackNode(Node):
     def __init__(self, executor):
         super().__init__("feedback")
         self.executor = executor
-        self.agent = create_feedback_agent(self.executor.llm)
+        self.agent = create_feedback_agent(executor.llm)
         self.rag = RAG()
 
     def execute(self, state: AgentState) -> dict:

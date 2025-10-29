@@ -251,17 +251,12 @@ def inspect_data(df: str) -> Dict:
 #     except Exception as e:
 #         return f"Error saving file: {str(e)}"
 
-def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> List:
+def make_plot_tools(df: pd.DataFrame, images_path: str) -> List:
     """ Create plotting tools with the given DataFrame
     """
     
-    # Ajustar o caminho das imagens com base no estado de pré-processamento
-    if is_before_dp:
-        images_path = images_path + "/before_dp"
-    else:
-        images_path = images_path + "/after_dp"
+    images_path = images_path
     
-    # Confirmar que o diretório de imagens existe
     if not os.path.exists(images_path):
         os.makedirs(images_path, exist_ok=True) 
 

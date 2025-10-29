@@ -71,7 +71,6 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
         - "next": The next action, which must be either "inspect", "imputator", "feature_engineer", "retriever", "plot", "automl" or "END".
         - "msg": A clear and specific instruction for the next agent. Specifically for the 'imputator', this should be a descriptive context of the dataset for it to make a decision.
-        - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. This is important for the plotter agent to know.
         - "test_size": (only if next is "automl") A float between 0 and 1 indicating the size of the test set (e.g., 0.2).
         - "target": (only if next is "automl") A string with the name of the target column in the dataset.
 
@@ -80,23 +79,23 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         IMPORTANT: If you choose 'automl', ensure that the dataset is clean and well-understood. You must have already delegated tasks to inspect, impute, and plot as needed before reaching this step.
 
         Example 1 (Starting):
-        {"output": "The analysis has just started. I will begin by getting an overview of the dataset.", "next": "inspect", "msg": "Summarize the dataset, checking for missing values and data types.", "is_before_dp": "True"}
+        {"output": "The analysis has just started. I will begin by getting an overview of the dataset.", "next": "inspect", "msg": "Summarize the dataset, checking for missing values and data types."}
 
         Example 2 (Delegating Imputation):
-        {"output": "The inspection revealed missing data in several columns. I will now delegate the task of choosing the best imputation method to the specialist.", "next": "imputator", "msg": "The initial analysis found missing values in the following columns: ['temperature', 'pressure']. The data appears to be time-series sensor data.", "is_before_dp": "True"}
+        {"output": "The inspection revealed missing data in several columns. I will now delegate the task of choosing the best imputation method to the specialist.", "next": "imputator", "msg": "The initial analysis found missing values in the following columns: ['temperature', 'pressure']. The data appears to be time-series sensor data."}
         
         Example 3 (Delegating Feature Engineering):
-        {"output": "The dataset is noisy, some feature extraction is essential", "next": "feature_engineer", "msg": "There is a noisy time series dataset, where the timestamp indicates  year, month, day and hour.", "is_before_dp": "False"}
+        {"output": "The dataset is noisy, some feature extraction is essential", "next": "feature_engineer", "msg": "There is a noisy time series dataset, where the timestamp indicates  year, month, day and hour."}
 
         Example 4 (Using the Retriever Correctly):
-        {"output": "The feature_engineer node failed. I will search the knowledge base for a solution.", "next": "retriever", "msg": "error in feature_engineer node: the node got stuck in a loop", is_before_dp": "False"}
+        {"output": "The feature_engineer node failed. I will search the knowledge base for a solution.", "next": "retriever", "msg": "error in feature_engineer node: the node got stuck in a loop"}
 
         Example 5 (Preparing for AutoML):
         {"output": "The dataset is now clean and well-understood. I will proceed to
-        prepare it for modeling by the AutoML agent.", "next": "automl", "msg": "", "is_before_dp": "False", "test_size": 0.2, "target": "temperature"}  
+        prepare it for modeling by the AutoML agent.", "next": "automl", "msg": "", "test_size": 0.2, "target": "temperature"}  
 
         Example 6 (Ending):
-        {"output": "The data has been inspected, imputed, visualized, and modeled. The analysis is complete.", "next": "END", "msg": "Workflow complete.", "is_before_dp": "False"}
+        {"output": "The data has been inspected, imputed, visualized, and modeled. The analysis is complete.", "next": "END", "msg": "Workflow complete."}
         """,
     )
 
@@ -169,11 +168,11 @@ def create_summarizer_agent(llm) -> AgentExecutor:
         tools=[]
     )
 
-def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: bool) -> AgentExecutor:
+def create_plotter_agent(df: pd.DataFrame, images_path: str, llm) -> AgentExecutor:
     """
     Creates the plotter agent
     """
-    plotting_tools = make_plot_tools(df, images_path, is_before_dp)
+    plotting_tools = make_plot_tools(df, images_path)
 
     return create_pandas_dataframe_agent(
         llm=llm,

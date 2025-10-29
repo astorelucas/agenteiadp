@@ -4,7 +4,7 @@ from typing import Literal
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage
-from agentai.agents import create_pandas_agent, create_supervisor_agent, create_imputator_agent, create_summarizer_agent, create_plotter_agent
+from agentai.agents import create_summarizer_agent
 from agentai.modules.common import AgentState
 from agentai.tools import ImputationStrategyFactory
 from agentai.nodes import (
@@ -40,7 +40,7 @@ class WorkflowExecutor:
         feature_engineer_node = FeatureEngineeringNode(self)
         imputator_node = ImputatorNode(self)
         retriever_node = RetrieverNode()
-        plotter_node = PlotterNode(self)
+        # plotter_node = PlotterNode(self)
         feedback_node = FeedbackNode(self)
         automl_node = AutoMLNode(self)
         
@@ -50,14 +50,18 @@ class WorkflowExecutor:
         workflow.add_node("feature_engineer", feature_engineer_node.execute)
         workflow.add_node("imputator", imputator_node.execute)
         workflow.add_node("retriever", retriever_node.execute)
-        workflow.add_node("plot", plotter_node.execute)
+        
+        # Colocaremos após completar o AUTOML
+        # workflow.add_node("plot", plotter_node.execute)
+        
         workflow.add_node("summarizer", self._summarizer_node)
         workflow.add_node("feedback", feedback_node.execute)
         workflow.add_node("automl", automl_node.execute)
         
-        workflow.set_entry_point("plot")
+        workflow.set_entry_point("supervisor")
 
-        workflow.add_edge("plot", "supervisor")
+        # workflow.add_edge("plot", "supervisor")
+        
         workflow.add_edge("inspect", "supervisor")
         workflow.add_edge("feature_engineer", "supervisor") 
         workflow.add_edge("imputator", "supervisor")
@@ -72,7 +76,7 @@ class WorkflowExecutor:
             self._should_continue,
             {
                 "inspect": "inspect",
-                "plot": "plot",
+                # "plot": "plot",
                 "imputator": "imputator",
                 "feature_engineer": "feature_engineer", 
                 "retriever": "retriever",
@@ -87,7 +91,7 @@ class WorkflowExecutor:
     def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer", "retriever", "automl", "end"]:
         next_decision = state.get("next", "").lower()
 
-        if  next_decision in ["inspect", "imputator", "feature_engineer", "retriever", "plot", "automl"]:
+        if  next_decision in ["inspect", "imputator", "feature_engineer", "retriever", "automl"]: # , "plot"
             return next_decision
         else:
             return "end"

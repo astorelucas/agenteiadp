@@ -13,10 +13,9 @@ from agentai.agents import (
     create_imputator_agent,
     create_plotter_agent,
     create_feedback_agent,
-    create_feature_engineering_agent
+    create_feature_engineering_agent,
+    create_automl_agent
 )
-
-
 
 class Node:
     def __init__(self, name: str, executor=None):
@@ -224,15 +223,22 @@ class SupervisorNode(Node):
         is_before_dp = plan.get("is_before_dp").lower() == "true"
         logs.append(f"\n[Supervisor Node] Decision made: {output}")
         
-        return {
-            "next": next_step, 
-            "msg": msg_out, 
-            "logs": logs, 
+        return_state = {
+            "next": next_step,
+            "msg": msg_out,
+            "logs": logs,
             "subagents_report": None,
-            "main_goal": main_goal, 
+            "main_goal": main_goal,
             "is_before_dp": is_before_dp
         }
 
+        if next_step == "automl":
+            test_size = plan.get("test_size")
+            target = plan.get("target")
+            return_state = {**return_state, "test_size": test_size, "target": target}
+
+        return return_state
+    
 class RetrieverNode(Node):
     def __init__(self):
         super().__init__("retriever")
@@ -327,5 +333,60 @@ class FeedbackNode(Node):
             report += f"Error during execution: {e}"
             logs.append(report)
             return {"logs": logs, "feedback": None, "summary": summary, "subagents_report": report}
+    
+class AutoMLNode(Node):
+    def __init__(self, executor):
+        super().__init__("automl")
+        self.executor = executor
 
+    def execute(self, state: AgentState) -> dict:
+        logs = state.get("logs", [])
+        msg = state.get("msg", "")
 
+        # Extract parameters from the state
+        test_size = float(state.get("test_size"))
+        target = state.get("target")
+
+        # Validate inputs
+        if not isinstance(test_size, (float)) or not (0 < test_size < 1):
+            error_message = "Invalid test_size. Must be a float between 0 and 1."
+            logs.append(f"[AutoML Node] {error_message}")
+            return {"subagents_report": error_message, "logs": logs}
+
+        if target not in self.executor.df.columns:
+            error_message = f"Target column '{target}' not found in the dataset."
+            logs.append(f"[AutoML Node] {error_message}")
+            return {"subagents_report": error_message, "logs": logs}
+        
+
+        automl_agent = create_automl_agent(self.executor.df, self.executor.llm, target, test_size)
+    
+        try:
+            # Invoke the AutoML agent
+            input_message = (
+                f"Based on the following instruction: '{msg}', select the best time series forecasting model and its hyperparameters using PyCaret.\n"
+            )
+
+            response = automl_agent.invoke({"input": input_message})
+
+            # Parse the response
+            raw_output = response.get("output", "") or str(response)
+            json_match = re.search(r"\{.*\}", raw_output, re.DOTALL)
+
+            if not json_match:
+                report = f"Error: AutoML agent failed to produce valid JSON. Output: {raw_output}"
+                logs.append(report)
+                return {"subagents_report": report, "logs": logs}
+
+            decision = json.loads(json_match.group(0))
+            model = decision.get("model")
+            params = decision.get("params", {})
+
+            report = f"AutoML selected model: {model} with parameters: {params}"
+            logs.append(report)
+
+        except Exception as e:
+            report = f"[AutoML Node] Error during execution: {e}"
+            logs.append(report)
+
+        return {"subagents_report": report, "logs": logs}

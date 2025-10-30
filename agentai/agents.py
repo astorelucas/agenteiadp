@@ -67,17 +67,17 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         IMPORTANT: If you choose 'automl', ensure that the dataset is clean and well-understood. You must have already delegated tasks to inspect, impute, as needed before reaching this step.
 
         Example 1 (Starting):
-        {"output": "The analysis has just started. I will begin by getting an overview of the dataset.", "next": "inspect", "msg": "Summarize the dataset, checking for missing values and data types.", "is_before_dp": "True"}
+        {"output": "The analysis has just started. I will begin by getting an overview of the dataset.", "next": "inspect", "msg": "Summarize the dataset, checking for missing values and data types."}
 
         Example 2 (Delegating Imputation):
-        {"output": "The inspection revealed missing data in several columns. I will now delegate the task of choosing the best imputation method to the specialist.", "next": "imputator", "msg": "The initial analysis found missing values in the following columns: ['temperature', 'pressure']. The data appears to be time-series sensor data.", "is_before_dp": "True"}
+        {"output": "The inspection revealed missing data in several columns. I will now delegate the task of choosing the best imputation method to the specialist.", "next": "imputator", "msg": "The initial analysis found missing values in the following columns: ['temperature', 'pressure']. The data appears to be time-series sensor data."}
         
         Example 3 (Delegating Feature Engineering):
-        {"output": "The dataset is noisy, some feature extraction is essential", "next": "feature_engineer", "msg": "There is a noisy time series dataset, where the timestamp indicates  year, month, day and hour.", "is_before_dp": "False"}
+        {"output": "The dataset is noisy, some feature extraction is essential", "next": "feature_engineer", "msg": "There is a noisy time series dataset, where the timestamp indicates  year, month, day and hour."}
 
         Example 4 (Preparing for AutoML):
         {"output": "The dataset is now clean and well-understood. I will proceed to
-        prepare it for modeling by the AutoML agent.", "next": "automl", "msg": "", "is_before_dp": "False", "test_size": 0.2, "target": "temperature"}  
+        prepare it for modeling by the AutoML agent.", "next": "automl", "msg": "", "test_size": 0.2, "target": "temperature"}  
 
         Example 5 (Ending):
         {"output": "The data has been inspected, imputed, visualized, and modeled. The analysis is complete.", "next": "END", "msg": "Workflow complete.", "is_before_dp": "False"}

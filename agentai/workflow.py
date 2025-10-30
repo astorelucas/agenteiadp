@@ -4,7 +4,7 @@ from typing import Literal
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage
-from agentai.agents import create_pandas_agent, create_supervisor_agent, create_imputator_agent, create_summarizer_agent, create_plotter_agent
+from agentai.agents import create_summarizer_agent
 from agentai.modules.common import AgentState
 from agentai.tools import ImputationStrategyFactory
 from agentai.nodes import (
@@ -44,6 +44,7 @@ class WorkflowExecutor:
         workflow.add_node("inspect", inspect_node.execute)
         workflow.add_node("feature_engineer", feature_engineer_node.execute)
         workflow.add_node("imputator", imputator_node.execute)
+
         workflow.add_node("summarizer", summarizer_node.execute)
         workflow.add_node("feedback", feedback_node.execute)
         # workflow.add_node("automl", automl_node.execute)
@@ -75,7 +76,7 @@ class WorkflowExecutor:
     def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer","end"]:
         next_decision = state.get("next", "").lower()
 
-        if  next_decision in ["inspect","imputator","feature_engineer"]:
+        if  next_decision in ["inspect", "imputator", "feature_engineer", "automl"]:
             return next_decision
         else:
             return "end"

@@ -27,7 +27,7 @@ def execute_pipeline():
     
     print("*** Iniciando o pipeline ***\n\n")
 
-    csv_path = "agentai/datasets/ETTh2.csv"
+    csv_path = "agentai/datasets/ETTh1.csv"
     plot_images_path = "agentai/images/plots"
 
     try:

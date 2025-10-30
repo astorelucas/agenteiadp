@@ -217,6 +217,7 @@ class SupervisorNode(Node):
             "msg": msg_out,
             "logs": logs,
             "subagents_report": None,
+            "is_before_dp": is_before_dp,
             "main_goal": main_goal
         }
 

@@ -50,9 +50,8 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         1.  **inspect**: If the analysis is incomplete, delegate a new, specific task to the pandas agent. The task should be a logical next step towards the main goal. 
         2.  **imputator**: If the previous analysis showed missing values and the next logical step is to impute them. You must delegate this to the imputation specialist.
         3.  **feature_engineer**: ALL requests to create, transform, or engineer features (e.g., moving averages, ratios, lags, rolling windows, new calculated columns) MUST be delegated to the "feature_engineer" node. 
-        4. **retriever**: To solve problems (like code errors, bad results) or for strategic guidance, you must use the retriever to consult past experiences. If it does not provide a helpful context, continue by yourself.
-        5. **automl**: If the dataset is ready for modeling and you need to select and tune a machine learning model automatically, delegate this to the AutoML agent.
-        6.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
+        4. **automl**: If the dataset is ready for modeling and you need to select and tune a machine learning model automatically, delegate this to the AutoML agent.
+        5.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
@@ -63,7 +62,6 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         - "target": (only if next is "automl") A string with the name of the target column in the dataset.
 
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
-        IMPORTANT: If the 'Report from the previous step' contains an ERROR or indicates a FAILURE or if you see that it is in a LOOP, you MUST prioritize using the 'retriever' node to find a solution. DO NOT repeat the same failed instruction.
         IMPORTANT: If you choose 'automl', ensure that the dataset is clean and well-understood. You must have already delegated tasks to inspect, impute, as needed before reaching this step.
 
         Example 1 (Starting):

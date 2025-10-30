@@ -150,9 +150,6 @@ class ImputationStrategyFactory:
         except TypeError as e:
             raise TypeError(f"Invalid parameters for '{name}': {e}")
 
-
-# @tool
-
 def analyze_missing_values(df: pd.DataFrame) -> dict:
     """Analyze missing values pattern in time series data"""
     analysis = {
@@ -162,26 +159,7 @@ def analyze_missing_values(df: pd.DataFrame) -> dict:
     }
     return analysis
 
-# # Ferramentas Auxiliares
-# @tool
-# def salvar_resultados() -> str:
-#     """
-#     **Salvar Resultados**
-#     **Uso ideal**:
-#     - Após uma ou mais operações de imputação, normalização, etc terem sido aplicadas e o resultado for satisfatório.
-#     - Para persistir o DataFrame processado e evitar a necessidade de reprocessamento.
-
-#     **Custo**: Baixo.
-
-#     **Como age**:
-#     - Simplesmente escreve o estado atual do DataFrame em memória para um arquivo CSV no disco, chamado 'resultado_imputado.csv'.
-#     - Esta é uma ação final para consolidar as alterações realizadas pelas outras ferramentas.
-#     """
-#     global df
-#     df.to_csv("./datasets/resultado_imputado.csv", index=False)
-#     return "DataFrame salvo como 'resultado_imputado.csv'."
-
-# # Inspection Tools
+# Inspection Tools
 @tool
 def inspect_data(df: str) -> Dict:
     """Perform a comprehensive inspection of a time series DataFrame."""
@@ -208,48 +186,6 @@ def inspect_data(df: str) -> Dict:
         }
     except Exception as e:
         return {"error": str(e)}
-
-
-# # Cleaning Tools
-# @tool
-# def clean_data(df_json: str) -> str:
-#     """Handle missing values, outliers, and infinity"""
-#     try:
-#         df = json_to_dataframe(df_json)
-        
-#         # Replace infinity with NA then interpolate
-#         df = df.replace([np.inf, -np.inf], None)
-        
-#         # Handle missing values
-#         if isinstance(df.index, pd.DatetimeIndex):
-#             df = df.interpolate(method='time')
-#         else:
-#             df = df.interpolate()
-            
-#         # Handle outliers for numeric columns
-#         for col in df.select_dtypes(include=['number']).columns:
-#             q1 = df[col].quantile(0.25)
-#             q3 = df[col].quantile(0.75)
-#             iqr = q3 - q1
-#             df[col] = df[col].clip(q1-1.5*iqr, q3+1.5*iqr)
-            
-#         return dataframe_to_json(df)
-#     except Exception as e:
-#         return dataframe_to_json(pd.DataFrame({"error": [str(e)]}))
-
-
-# # Download Tool
-# @tool
-# def save_data(df_json: str) -> str:
-#     """Save processed data to CSV with infinity handling"""
-#     try:
-#         df = json_to_dataframe(df_json)
-#         df = df.replace([np.inf, -np.inf], None)
-#         filename = f"preprocessed_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-#         df.to_csv(filename)
-#         return filename
-#     except Exception as e:
-#         return f"Error saving file: {str(e)}"
 
 def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> List:
     """ Create plotting tools with the given DataFrame
@@ -555,131 +491,224 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
     """ Create AutoML tools with the given DataFrame
     """
 
+    # @tool
+    # def pycaret() -> dict:
+    #     """
+    #     Perform time series forecasting using PyCaret.
+    #     Args:
+    #         None
+    #     Returns:
+    #         dict: Contains real values, forecast values, best model info, and logs        
+    #     """
+    #     new_df = df.copy()
+    #     logs = []
+
+    #     # ---------- Input Validation ----------
+    #     if not isinstance(new_df, pd.DataFrame):
+    #         error_message = "Input 'df' must be a pandas DataFrame."
+    #         logs.append(error_message)
+    #         return {"error": error_message, "logs": logs}
+
+    #     if new_df.empty:
+    #         error_message = "Dataset is empty."
+    #         logs.append(error_message)
+    #         return {"error": error_message, "logs": logs}
+
+    #     if not isinstance(test_size, float) or not (0 < test_size < 1):
+    #         error_message = "Invalid 'test_size'. Must be a float between 0 and 1."
+    #         logs.append(error_message)
+    #         return {"error": error_message, "logs": logs}
+
+    #     if not isinstance(target, str):
+    #         error_message = "Invalid 'target'. Must be a string."
+    #         logs.append(error_message)  
+    #         return {"error": error_message, "logs": logs}
+    #     elif target not in new_df.columns:
+    #         error_message = f"Target column '{target}' not found in dataset."
+    #         logs.append(error_message)
+    #         return {"error": error_message, "logs": logs}
+        
+    #     time_cols = (col for col in new_df.columns if 'time' in col.lower() or 'date' in col.lower())
+
+    #     if not time_cols:
+    #         error_message = "No time-related column found in dataset."
+    #         logs.append(error_message)
+    #         return {"error": error_message, "logs": logs}
+
+    #     time_col = next(time_cols)
+    #     logs.append(f"Using '{time_col}' as time index column.")
+
+    #     # ---------- Data Preparation ----------
+    #     try:
+    #         print(f"time_col before to_Datetime => {new_df[time_col].head()}")
+    #         new_df[time_col] = pd.to_datetime(new_df[time_col])
+    #         print(f"time_col after to_Datetime => {new_df[time_col].head()}")
+    #         new_df.set_index(time_col, inplace=True)
+    #         test_size_int = max(1, int(len(new_df) * test_size))
+    #         fh = test_size_int
+
+    #         train = new_df.iloc[:-test_size_int]
+    #         test = new_df.iloc[-test_size_int:]
+
+    #         logs.append(f"Dataset split into train ({len(train)}) and test ({len(test)}) sets.")
+
+    #     except Exception as e:
+    #         error_message = f"Error during data preparation of pycaret tool: {e}"
+    #         logs.append(error_message)
+    #         return {"error": error_message, "logs": logs}
+        
+    #     # ---------- Pycaret Execution ----------
+    #     try:
+    #         # Initialize PyCaret experiment
+    #         exp_auto = TSForecastingExperiment()
+    #         exp_auto.setup(
+    #             data=train,
+    #             target=target,
+    #             enforce_exogenous=True,
+    #             numeric_imputation_target="ffill",
+    #             numeric_imputation_exogenous="ffill",
+    #             session_id=42,
+    #             verbose=False
+    #         )
+
+    #         logs.append("PyCaret experiment setup completed.")
+
+    #         # Compare models
+    #         best = exp_auto.compare_models(verbose=False)
+    #         if best in [None, [], {}]:
+    #             logs.append("compare_models() returned no valid model. Falling back to ARIMA.")
+    #             best = exp_auto.create_model("arima")
+
+    #         logs.append(f"Best model selected: {best}")
+
+    #         # Tune the best model
+    #         best_model = exp_auto.tune_model(
+    #             best,
+    #             choose_better=True,
+    #             n_iter=50,
+    #             fold=3,
+    #             search_algorithm="random",
+    #             tuner_verbose=True,
+    #         )
+
+    #         logs.append("Best model tuned successfully.")
+    #         print(best_model)
+
+    #         # Forecast
+    #         forecast = exp_auto.predict_model(best_model, fh=fh)
+    #         logs.append("Forecasting completed.")
+
+    #         # Return results
+    #         real = test[target].values
+    #         forecast_values = forecast.values.flatten()
+
+    #         return {
+    #             "real": real.tolist(),
+    #             "forecast": forecast_values.tolist(),
+    #             "best_model": str(best_model),
+    #             "params": best_model.get_params(),
+    #             "logs": logs
+    #         }
+
+    #     except Exception as e:
+    #         error_message = f"Error during PyCaret execution: {e}"
+    #         logs.append(error_message)
+    #         return {"error": error_message, "logs": logs}
+
     @tool
-    def pycaret() -> dict:
+    def autogluon_forecast() -> dict:
         """
-        Perform time series forecasting using PyCaret.
-        Args:
-            None
-        Returns:
-            dict: Contains real values, forecast values, best model info, and logs        
+        Perform time series forecasting using AutoGluon TimeSeriesPredictor on the in-memory DataFrame.
+        Uses the first time/date-like column as timestamp and a single series item_id.
+        Returns real values, forecast values, best model info and basic logs.
         """
-        new_df = df.copy()
         logs = []
+        new_df = df.copy()
 
-        # ---------- Input Validation ----------
+        # ---------- Validation ----------
         if not isinstance(new_df, pd.DataFrame):
-            error_message = "Input 'df' must be a pandas DataFrame."
-            logs.append(error_message)
-            return {"error": error_message, "logs": logs}
-
+            return {"error": "Input 'df' must be a pandas DataFrame.", "logs": logs}
         if new_df.empty:
-            error_message = "Dataset is empty."
-            logs.append(error_message)
-            return {"error": error_message, "logs": logs}
-
+            return {"error": "Dataset is empty.", "logs": logs}
+        if not isinstance(target, str) or target not in new_df.columns:
+            return {"error": f"Target column '{target}' not found in dataset.", "logs": logs}
         if not isinstance(test_size, float) or not (0 < test_size < 1):
-            error_message = "Invalid 'test_size'. Must be a float between 0 and 1."
-            logs.append(error_message)
-            return {"error": error_message, "logs": logs}
+            return {"error": "Invalid 'test_size'. Must be a float between 0 and 1.", "logs": logs}
 
-        if not isinstance(target, str):
-            error_message = "Invalid 'target'. Must be a string."
-            logs.append(error_message)  
-            return {"error": error_message, "logs": logs}
-        elif target not in new_df.columns:
-            error_message = f"Target column '{target}' not found in dataset."
-            logs.append(error_message)
-            return {"error": error_message, "logs": logs}
-        
-        time_cols = (col for col in new_df.columns if 'time' in col.lower() or 'date' in col.lower())
+        # Lazy import to avoid hard dependency when tool unused
+        try:
+            from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor  # type: ignore
+        except Exception as e:
+            return {"error": f"AutoGluon not available: {e}. Try: pip install autogluon.timeseries", "logs": logs}
 
+        # ---------- Identify timestamp column ----------
+        time_cols = [c for c in new_df.columns if ("time" in c.lower()) or ("date" in c.lower()) or ("stamp" in c.lower())]
         if not time_cols:
-            error_message = "No time-related column found in dataset."
-            logs.append(error_message)
-            return {"error": error_message, "logs": logs}
+            return {"error": "No time/date column inferred. Ensure there is a timestamp column.", "logs": logs}
+        time_col = time_cols[0]
+        logs.append(f"Using '{time_col}' as timestamp column.")
 
-        time_col = next(time_cols)
-        logs.append(f"Using '{time_col}' as time index column.")
-
-        # ---------- Data Preparation ----------
+        # ---------- Prepare TimeSeriesDataFrame ----------
         try:
-            print(f"time_col before to_Datetime => {new_df[time_col].head()}")
             new_df[time_col] = pd.to_datetime(new_df[time_col])
-            print(f"time_col after to_Datetime => {new_df[time_col].head()}")
-            new_df.set_index(time_col, inplace=True)
-            test_size_int = max(1, int(len(new_df) * test_size))
-            fh = test_size_int
+            new_df = new_df.sort_values(time_col)
+            new_df["item_id"] = "series_0"
 
-            train = new_df.iloc[:-test_size_int]
-            test = new_df.iloc[-test_size_int:]
-
-            logs.append(f"Dataset split into train ({len(train)}) and test ({len(test)}) sets.")
-
+            tsdf = TimeSeriesDataFrame.from_data_frame(
+                new_df[["item_id", time_col, target]].copy(),
+                id_column="item_id",
+                timestamp_column=time_col,
+            )
         except Exception as e:
-            error_message = f"Error during data preparation of pycaret tool: {e}"
-            logs.append(error_message)
-            return {"error": error_message, "logs": logs}
-        
-        # ---------- Pycaret Execution ----------
+            return {"error": f"Failed to build TimeSeriesDataFrame: {e}", "logs": logs}
+
+        # ---------- Split ----------
         try:
-            # Initialize PyCaret experiment
-            exp_auto = TSForecastingExperiment()
-            exp_auto.setup(
-                data=train,
-                target=target,
-                enforce_exogenous=True,
-                numeric_imputation_target="ffill",
-                numeric_imputation_exogenous="ffill",
-                session_id=42,
-                verbose=False
-            )
-
-            logs.append("PyCaret experiment setup completed.")
-
-            # Compare models
-            best = exp_auto.compare_models(verbose=False)
-            if best in [None, [], {}]:
-                logs.append("compare_models() returned no valid model. Falling back to ARIMA.")
-                best = exp_auto.create_model("arima")
-
-            logs.append(f"Best model selected: {best}")
-
-            # Tune the best model
-            best_model = exp_auto.tune_model(
-                best,
-                choose_better=True,
-                n_iter=50,
-                fold=3,
-                search_algorithm="random",
-                tuner_verbose=True,
-            )
-
-            logs.append("Best model tuned successfully.")
-            print(best_model)
-
-            # Forecast
-            forecast = exp_auto.predict_model(best_model, fh=fh)
-            logs.append("Forecasting completed.")
-
-            # Return results
-            real = test[target].values
-            forecast_values = forecast.values.flatten()
-
-            return {
-                "real": real.tolist(),
-                "forecast": forecast_values.tolist(),
-                "best_model": str(best_model),
-                "params": best_model.get_params(),
-                "logs": logs
-            }
-
+            fh = max(1, int(len(tsdf) * test_size))
+            train_data, test_data = tsdf.train_test_split(prediction_length=fh)
+            logs.append(f"Split data into train ({len(train_data)}) and test ({len(test_data)}). Prediction length={fh}")
         except Exception as e:
-            error_message = f"Error during PyCaret execution: {e}"
-            logs.append(error_message)
-            return {"error": error_message, "logs": logs}
+            return {"error": f"Failed to split data: {e}", "logs": logs}
 
-    return [pycaret]
+        # ---------- Train ----------
+        try:
+            predictor = TimeSeriesPredictor(
+                prediction_length=fh,
+                target=target,
+                eval_metric="MASE",
+                verbosity=2,
+            )
+            predictor.fit(train_data, presets="medium_quality", num_val_windows=1, enable_ensemble=True)
+            logs.append("AutoGluon training completed.")
+        except Exception as e:
+            return {"error": f"AutoGluon training failed: {e}", "logs": logs}
+
+        # ---------- Predict ----------
+        try:
+            preds = predictor.predict(test_data)
+            # Extract arrays for single item_id
+            mean_series = preds["mean"]
+            real_series = test_data[target]
+            # Align last fh points from test target for comparison
+            real_tail = real_series.groupby(level="item_id").tail(fh).values
+            forecast_vals = mean_series.groupby(level="item_id").tail(fh).values
+        except Exception as e:
+            return {"error": f"Prediction failed: {e}", "logs": logs}
+
+        best_model = None
+        try:
+            best_model = predictor.model_best
+        except Exception:
+            best_model = None
+
+        return {
+            "real": real_tail.tolist(),
+            "forecast": forecast_vals.tolist(),
+            "best_model": str(best_model) if best_model is not None else None,
+            "logs": logs,
+        }
+
+    return [autogluon_forecast]
 
 @tool
 def retrieve_context(query: str) -> dict:
@@ -696,7 +725,4 @@ def retrieve_context(query: str) -> dict:
     rag = RAG()
     return rag.retrieve(query)
 
-
 inspection_tools = [inspect_data]
-# cleaning_tools = [clean_data]
-# feature_tools = [imputacao_k_nearest_neighbors, imputacao_mice, imputacao_gp]

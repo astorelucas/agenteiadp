@@ -14,17 +14,6 @@ from agentai.tools import (
     make_automl_tools
 )
 
-# load_dotenv()
-
-#os.environ["DEEPINFRA_API_KEY"] = getpass("Enter your key: ")
-# llm = ChatDeepInfra(model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8")
-
-#llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct")
-
-
-# create_supervisor_agent: '{' instead of '{{', because its not fstring, just a normal string
-# create_pandas_agent: if needed, use '{{' instead of '{', as it uses a fstring internally (????????????????????)
-
 def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
     return create_pandas_dataframe_agent(
         llm=llm,
@@ -45,7 +34,6 @@ def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         """
     )
 
-
 def create_supervisor_agent(llm) -> AgentExecutor:
     """Creates the supervisor agent"""
     return create_react_agent(
@@ -63,21 +51,20 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         2.  **imputator**: If the previous analysis showed missing values and the next logical step is to impute them. You must delegate this to the imputation specialist.
         3.  **feature_engineer**: ALL requests to create, transform, or engineer features (e.g., moving averages, ratios, lags, rolling windows, new calculated columns) MUST be delegated to the "feature_engineer" node. 
         4. **retriever**: To solve problems (like code errors, bad results) or for strategic guidance, you must use the retriever to consult past experiences. If it does not provide a helpful context, continue by yourself.
-        5.  **plot**: If the inspection is done and you believe that visualizations will help in understanding the data better, delegate a task to the plotter agent.
-        6. **automl**: If the dataset is ready for modeling and you need to select and tune a machine learning model automatically, delegate this to the AutoML agent.
-        7.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
+        5. **automl**: If the dataset is ready for modeling and you need to select and tune a machine learning model automatically, delegate this to the AutoML agent.
+        6.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
-        - "next": The next action, which must be either "inspect", "imputator", "feature_engineer", "retriever", "plot", "automl" or "END".
+        - "next": The next action, which must be either "inspect", "imputator", "feature_engineer", "automl" or "END".
         - "msg": A clear and specific instruction for the next agent. Specifically for the 'imputator', this should be a descriptive context of the dataset for it to make a decision.
-        - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. This is important for the plotter agent to know.
+        - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. 
         - "test_size": (only if next is "automl") A float between 0 and 1 indicating the size of the test set (e.g., 0.2).
         - "target": (only if next is "automl") A string with the name of the target column in the dataset.
 
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
         IMPORTANT: If the 'Report from the previous step' contains an ERROR or indicates a FAILURE or if you see that it is in a LOOP, you MUST prioritize using the 'retriever' node to find a solution. DO NOT repeat the same failed instruction.
-        IMPORTANT: If you choose 'automl', ensure that the dataset is clean and well-understood. You must have already delegated tasks to inspect, impute, and plot as needed before reaching this step.
+        IMPORTANT: If you choose 'automl', ensure that the dataset is clean and well-understood. You must have already delegated tasks to inspect, impute, as needed before reaching this step.
 
         Example 1 (Starting):
         {"output": "The analysis has just started. I will begin by getting an overview of the dataset.", "next": "inspect", "msg": "Summarize the dataset, checking for missing values and data types.", "is_before_dp": "True"}
@@ -88,14 +75,11 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         Example 3 (Delegating Feature Engineering):
         {"output": "The dataset is noisy, some feature extraction is essential", "next": "feature_engineer", "msg": "There is a noisy time series dataset, where the timestamp indicates  year, month, day and hour.", "is_before_dp": "False"}
 
-        Example 4 (Using the Retriever Correctly):
-        {"output": "The feature_engineer node failed. I will search the knowledge base for a solution.", "next": "retriever", "msg": "error in feature_engineer node: the node got stuck in a loop", is_before_dp": "False"}
-
-        Example 5 (Preparing for AutoML):
+        Example 4 (Preparing for AutoML):
         {"output": "The dataset is now clean and well-understood. I will proceed to
         prepare it for modeling by the AutoML agent.", "next": "automl", "msg": "", "is_before_dp": "False", "test_size": 0.2, "target": "temperature"}  
 
-        Example 6 (Ending):
+        Example 5 (Ending):
         {"output": "The data has been inspected, imputed, visualized, and modeled. The analysis is complete.", "next": "END", "msg": "Workflow complete.", "is_before_dp": "False"}
         """,
     )
@@ -140,7 +124,6 @@ def create_imputator_agent(llm) -> AgentExecutor:
         """,
 
     )
-
 
 def create_summarizer_agent(llm) -> AgentExecutor:
     """Creates the summarizer agent"""
@@ -208,7 +191,6 @@ def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: 
         - retrieve_context: Useful to learn how to solve problems or to get advices via RAG. Do not hesitate to use it after ANY error.
         """    
     )
-
 
 def create_feedback_agent(llm) -> AgentExecutor:
     """Cria o agente de retroalimentação (aprendizados passados)"""
@@ -285,7 +267,6 @@ def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         """
     )
 
-
 def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float) -> AgentExecutor:
     """
     Cria o agente AutoML
@@ -300,13 +281,15 @@ def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float) ->
         handle_parsing_errors=True,
         extra_tools=automl_tools,
         prefix="""
-        You are an AutoML Agent specialized in time series forecasting using PyCaret.
+        You are an AutoML Agent specialized in time series forecasting using both PyCaret and AutoGluon.
 
         ### Instructions:
-        1. The dataset is already loaded in memory - DO NOT try to load or access it directly
-        2. Use the 'pycaret' tool to perform forecasting tasks. DO NOT try to pass parameters manually, the tool will handle that for you.
-        3. Follow the user's instructions carefully to select, train, and evaluate models
-        4. After receiving results, format them as JSON
+        1. The dataset is already loaded in memory - DO NOT try to load it from disk.
+        2. Prefer using the provided tools to run forecasting tasks:
+           - pycaret: time series forecasting via PyCaret
+           - autogluon_forecast: AutoGluon TimeSeries forecasting
+        3. Choose one tool based on suitability; if unsure, try AutoGluon first and fallback to PyCaret.
+        4. After receiving results, format them as JSON.
 
         ### Output Format:
         Return ONLY valid JSON (no markdown, no code blocks):
@@ -321,6 +304,6 @@ def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float) ->
         ### Important:
         - DO NOT execute Python code directly
         - DO NOT try to access the dataframe 'df'
-        - ONLY use the pycaret tools provided
+        - ONLY use the provided automl tools (pycaret, autogluon_forecast)
         """
   )

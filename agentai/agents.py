@@ -54,32 +54,28 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         5.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
         ALWAYS return ONLY a valid JSON object with the following fields:
-        - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
+        - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action. If choosing Automl, clearly explain how you selected the `test_size` and `target` (did you extract it from user prompt, or did you infer/choose it from the dataset columns, summary, or a typical default?).
         - "next": The next action, which must be either "inspect", "imputator", "feature_engineer", "automl" or "END".
         - "msg": A clear and specific instruction for the next agent. Specifically for the 'imputator', this should be a descriptive context of the dataset for it to make a decision.
         - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. 
-        - "test_size": (only if next is "automl") A float between 0 and 1 indicating the size of the test set (e.g., 0.2).
-        - "target": (only if next is "automl") A string with the name of the target column in the dataset.
+        - "test_size": (REQUIRED if next is "automl") A float between 0 and 1 indicating the size of the test set (e.g., 0.2, use 0.2 if user doesn't specify and you can't infer from summary). You must either extract it from the user prompt or reason about a suitable default.
+        - "target": (REQUIRED if next is "automl") A string with the name of the target column in the dataset. If not in the user's prompt, use your findings from data inspection (e.g., pick a numeric column matching forecast context or summary's most likely target; default to a column named 'target' or the first time series value column).
 
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
         IMPORTANT: If you choose 'automl', ensure that the dataset is clean and well-understood. You must have already delegated tasks to inspect, impute, as needed before reaching this step.
 
-        Example 1 (Starting):
-        {"output": "The analysis has just started. I will begin by getting an overview of the dataset.", "next": "inspect", "msg": "Summarize the dataset, checking for missing values and data types."}
+        Example 1 (User Specifies Parameters):
+        User prompt: "Forecast temperature for the next 48 hours using 20% test split."
+        {{"output": "User explicitly specified 'temperature' as target and test size as 0.2. Proceeding to AutoML.", "next": "automl", "msg": "", "is_before_dp": false, "test_size": 0.2, "target": "temperature"}}
 
-        Example 2 (Delegating Imputation):
-        {"output": "The inspection revealed missing data in several columns. I will now delegate the task of choosing the best imputation method to the specialist.", "next": "imputator", "msg": "The initial analysis found missing values in the following columns: ['temperature', 'pressure']. The data appears to be time-series sensor data."}
-        
-        Example 3 (Delegating Feature Engineering):
-        {"output": "The dataset is noisy, some feature extraction is essential", "next": "feature_engineer", "msg": "There is a noisy time series dataset, where the timestamp indicates  year, month, day and hour."}
+        Example 2 (Agent Deduces Parameters):
+        User prompt: "Run a forecast for this dataset."
+        Dataset columns: ["date", "pressure", "temperature", "humidity"]
+        {{"output": "User didn't specify test split or target; defaulting to test_size=0.2 and choosing 'temperature' because it is a numerical feature and often forecasted in sensor timeseries.", "next": "automl", "msg": "", "is_before_dp": false, "test_size": 0.2, "target": "temperature"}}
 
-        Example 4 (Preparing for AutoML):
-        {"output": "The dataset is now clean and well-understood. I will proceed to
-        prepare it for modeling by the AutoML agent.", "next": "automl", "msg": "", "test_size": 0.2, "target": "temperature"}  
-
-        Example 5 (Ending):
-        {"output": "The data has been inspected, imputed, visualized, and modeled. The analysis is complete.", "next": "END", "msg": "Workflow complete.", "is_before_dp": "False"}
-        """,
+        Example 3 (Ending):
+        {{"output": "The data has been inspected, imputed, visualized, and modeled. The analysis is complete.", "next": "END", "msg": "Workflow complete.", "is_before_dp": "False"}}
+        """
     )
 
 def create_imputator_agent(llm) -> AgentExecutor:
@@ -279,29 +275,34 @@ def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float) ->
         handle_parsing_errors=True,
         extra_tools=automl_tools,
         prefix="""
-        You are an AutoML Agent specialized in time series forecasting using both PyCaret and AutoGluon.
+        You are an AutoML Agent specialized in time series forecasting. You have access to autogluon_forecast.
 
-        ### Instructions:
-        1. The dataset is already loaded in memory - DO NOT try to load it from disk.
-        2. Prefer using the provided tools to run forecasting tasks:
-           - pycaret: time series forecasting via PyCaret
-           - autogluon_forecast: AutoGluon TimeSeries forecasting
-        3. Choose one tool based on suitability; if unsure, try AutoGluon first and fallback to PyCaret.
-        4. After receiving results, format them as JSON.
+        Your job is to call exactly ONE of these tools. NEVER run forecasting yourself or return a result without using a tool.
 
-        ### Output Format:
-        Return ONLY valid JSON (no markdown, no code blocks):
+        AFTER a successful prediction, you MUST call the visualize_autogluon_forecast tool (with appropriate model directory and test data) to generate a plot of the results. ALWAYS return the path to the generated plot (plot_path) in your output if visualization succeeds.
+
+        The output from these tools will include at least:
+            - "real": array/list of true values for the forecast window (from the test set)
+            - "forecast": array/list of predicted target values (same length as real)
+            - "best_model": name/identifier of the best-performing model
+            - "logs": list of log strings describing key pipeline and model steps
+            - "plot_path": path to the saved visualization image (if plotting is successful)
+
+        ALWAYS return a single well-formatted JSON object with these fields. Only include additional fields if present in the tool output. Do not synthesize or invent fields.
+
+        Example of a correct output:
         {{
-            "model": "model_name",
-            "params": {{
-                "param1": value1,
-                "param2": value2
-            }}
+            "real": [10.3, 9.8, 11.2, ...],
+            "forecast": [10.5, 9.5, 10.9, ...],
+            "best_model": "NaiveMean",
+            "logs": ["Using 'date' as timestamp column.", "Split data into train (100) and test (25).", ...],
+            "plot_path": "AutogluonModels/prediction_plot.png"
         }}
 
-        ### Important:
-        - DO NOT execute Python code directly
-        - DO NOT try to access the dataframe 'df'
-        - ONLY use the provided automl tools (pycaret, autogluon_forecast)
+        Do NOT include a 'params' field unless it comes directly from the tool's output. Do NOT output markdown or code fencing; return pure JSON only.
+
+        If the main tool (autogluon_forecast) fails due to missing dependencies, clearly indicate it in logs, call pycaret, and return only the last successful result.
+
+        Think step by step: choose the appropriate tool, run it, check for errors, then call visualize_autogluon_forecast and output the full result as JSON just as returned by the tools.
         """
   )

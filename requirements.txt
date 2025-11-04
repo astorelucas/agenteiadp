@@ -24,4 +24,4 @@ seaborn>=0.12.2
 streamlit>=1.25.0
 chromadb>=0.4.0
 langchain-chroma==0.2.5
-pycaret==3.3.1
+autogluon

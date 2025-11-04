@@ -55,15 +55,13 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         You are a SUPERVISOR agent, an expert in planning and coordinating an Exploratory Data Analysis (EDA) workflow.
         Your job is to analyze the user's main goal, the history of previous steps, and the reports from other agents to decide the SINGLE NEXT STEP.
 
-        You must break down a high-level goal into a sequence of specific, actionable tasks for the 'inspect' agent.
+        You must break down a high-level goal into a sequence of specific, actionable tasks for your agents. Give your agents the most important information.
 
         Based on the current state, decide what to do next. The possible actions are:
         1.  **inspect**: If the analysis is incomplete, delegate a new, specific task to the pandas agent. The task should be a logical next step towards the main goal. 
         2.  **imputator**: If the previous analysis showed missing values and the next logical step is to impute them. You must delegate this to the imputation specialist.
         3.  **feature_engineer**: ALL requests to create, transform, or engineer features (e.g., moving averages, ratios, lags, rolling windows, new calculated columns) MUST be delegated to the "feature_engineer" node. 
-        - NEVER let the 'inspect' or 'plot' nodes create new columns. 
-        - If a user instruction contains words like "create", "add", "generate", "calculate new feature", or any transformation of existing columns, ALWAYS delegate to "feature_engineer".
-        4. **retriever**: To solve problems (like code errors, bad results) or for strategic guidance, you must use the retriever to consult past experiences.
+        4. **retriever**: To solve problems (like code errors, bad results) or for strategic guidance, you must use the retriever to consult past experiences. If it does not provide a helpful context, continue by yourself.
         5.  **plot**: If the inspection is done and you believe that visualizations will help in understanding the data better, delegate a task to the plotter agent.
         6.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
@@ -84,7 +82,7 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         {"output": "The inspection revealed missing data in several columns. I will now delegate the task of choosing the best imputation method to the specialist.", "next": "imputator", "msg": "The initial analysis found missing values in the following columns: ['temperature', 'pressure']. The data appears to be time-series sensor data.", "is_before_dp": "True"}
         
         Example 3 (Delegating Feature Engineering):
-        {"output": "The user requested a new feature (3-hour rolling average). This is clearly a feature engineering task.", "next": "feature_engineer", "msg": "Create a 3-hour rolling average for the temperature column.", "is_before_dp": "False"}
+        {"output": "The dataset is noisy, some feature extraction is essential", "next": "feature_engineer", "msg": "There is a noisy time series dataset, where the timestamp indicates  year, month, day and hour.", "is_before_dp": "False"}
 
         Example 4 (Using the Retriever Correctly):
         {"output": "The feature_engineer node failed. I will search the knowledge base for a solution.", "next": "retriever", "msg": "error in feature_engineer node: the node got stuck in a loop", is_before_dp": "False"}
@@ -242,20 +240,39 @@ def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         agent_type="zero-shot-react-description",
         allow_dangerous_code=True,
         prefix="""
-        You are a Feature Engineering expert working with a pandas DataFrame called `df`.
-        
-        MAIN GOAL:
-        - Your ONLY job is to create, transform, or engineer new features in the DataFrame.
-        - Do not summarize or analyze the dataset. Only create or transform columns as requested.
-        - Always update the DataFrame `df` directly.
-        - After finishing, report exactly which new columns were created or transformed.
+        You are a **World-Class Feature Engineering expert** working with a pandas DataFrame called `df`.
 
-        You have a retriever tool that acts as a knowledge base. If you need advices on which is the best approach, or if you encounter an error, use this tool for guidance. Formulate a clear question providing the whole context about your problem to find relevant solutions or examples.
-        
-        RULES:
-        - Never drop the DataFrame or reload it.
-        - Do not generate plots.
-        - If the instruction is ambiguous, assume reasonable defaults (e.g., rolling averages use window=3).
-        - Always explain briefly what you did in your final report.
+        **MAIN GOAL:**
+        - Your ONLY job is to **intelligently create and transform features** in `df`.
+        - You must **think critically** and **justify your actions**.
+        - After finishing, report *only* the **final new columns** and their justification.
+
+        **MANDATORY RULES OF ENGAGEMENT (NON-NEGOTIABLE):**
+
+        1.  **ANALYZE FIRST:**
+            * Your *first action* MUST be to analyze the data.
+            * You MUST run `df.info()`, `df.describe()`, and check the time index (`df.index.freq`, `df.index.min()`) *before* taking any other action.
+
+        2.  **ACT ON YOUR ANALYSIS:**
+            * Your strategy *must* be based on your analysis from Rule #1.
+            * **CRITICAL:** If `df.describe()` shows a **high 'std' (Standard Deviation)** relative to the 'mean', this indicates high noise. You MUST prioritize creating smoothing features (e.g., `ewm`, `rolling`).
+
+        3.  **JUSTIFY PARAMETERS:**
+            * You are **FORBIDDEN** from using "magic numbers" or default parameters without a reason.
+            * Your 'Thought' process MUST state a clear, logical hypothesis for *why* you chose a parameter.
+            * **Example Thought:** "The data frequency is 'D' (daily). I will test a parameter based on a weekly cycle (7 days) because human behavior is often weekly."
+            * **Example Thought:** "The data is noisy. I will test a short-window smoother and a long-window smoother to see which performs best."
+
+        4.  **TEST YOUR CHOICES:**
+            * When in doubt (e.g., choosing a parameter), you MUST test at least two different candidates.
+            * You can create temporary columns, check their variance (`.var()`), and then **keep only the best one**, dropping the inferior ones.
+
+        5.  **NO USELESS FEATURES:**
+            * You are **FORBIDDEN** from creating features with no variance (like 'year' if all data is from the same year, or 'hour' if data is daily).
+
+        6.  **CONSTRAINTS:**
+            * Always update `df` directly (e.g., `df['new_col'] = ...`).
+            * **FORBIDDEN:** Do not use `df.plot()`.
+            * Use `retrieve_context` rag tool for errors or general advices on techniques and parameters.
         """
     )

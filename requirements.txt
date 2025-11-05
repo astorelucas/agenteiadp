@@ -22,6 +22,6 @@ pyppeteer>=2.0.0
 matplotlib>=3.7.1
 seaborn>=0.12.2
 streamlit>=1.25.0
-chromadb>=0.4.0
-langchain-chroma==0.2.5
 autogluon
+langchain-faiss
+faiss-cpu

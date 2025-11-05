@@ -506,6 +506,10 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
             return {"error": "Invalid 'test_size'. Must be a float between 0 and 1.", "logs": logs}
 
         # Lazy import to avoid hard dependency when tool unused
+        try:
+            from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor  # type: ignore
+        except Exception as e:
+            return {"error": f"AutoGluon not available: {e}. Try: pip install autogluon.timeseries", "logs": logs}
 
         # ---------- Identify timestamp column ----------
         time_cols = [c for c in new_df.columns if ("time" in c.lower()) or ("date" in c.lower()) or ("stamp" in c.lower())]

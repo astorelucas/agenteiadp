@@ -3,8 +3,6 @@ from typing import Literal
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
-from langchain_core.messages import HumanMessage
-from agentai.agents import create_summarizer_agent
 from agentai.modules.common import AgentState
 from agentai.tools import ImputationStrategyFactory
 from agentai.nodes import (
@@ -13,7 +11,7 @@ from agentai.nodes import (
     ImputatorNode,
     SupervisorNode,
     FeedbackNode,
-    # AutoMLNode,
+    AutoMLNode,
     SummarizerNode
 )
 
@@ -36,7 +34,7 @@ class WorkflowExecutor:
         feature_engineer_node = FeatureEngineeringNode(self)
         imputator_node = ImputatorNode(self)
         feedback_node = FeedbackNode(self)
-        # automl_node = AutoMLNode(self)
+        automl_node = AutoMLNode(self)
         summarizer_node = SummarizerNode(self)
         
         # register nodes using their execute methods
@@ -47,7 +45,7 @@ class WorkflowExecutor:
 
         workflow.add_node("summarizer", summarizer_node.execute)
         workflow.add_node("feedback", feedback_node.execute)
-        # workflow.add_node("automl", automl_node.execute)
+        workflow.add_node("automl", automl_node.execute)
         
         workflow.set_entry_point("supervisor")
 
@@ -65,7 +63,7 @@ class WorkflowExecutor:
                 "inspect": "inspect",
                 "imputator": "imputator",
                 "feature_engineer": "feature_engineer", 
-                # "automl": "automl",
+                "automl": "automl",
                 "end": "feedback",
             },
         )
@@ -73,10 +71,10 @@ class WorkflowExecutor:
         memory = MemorySaver()
         return workflow.compile(checkpointer=memory)
 
-    def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer","end"]:
+    def _should_continue(self, state: AgentState) -> Literal["inspect","imputator","feature_engineer","automl", "end"]:
         next_decision = state.get("next", "").lower()
 
-        if  next_decision in ["inspect", "imputator", "feature_engineer", "automl"]:
+        if  next_decision in ["inspect", "imputator", "feature_engineer","automl"]:
             return next_decision
         else:
             return "end"

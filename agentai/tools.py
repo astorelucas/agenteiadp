@@ -11,11 +11,9 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 import seaborn as sns
 
-
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 from sklearn.experimental import enable_iterative_imputer
-from sklearn.impute import IterativeImputer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.impute import KNNImputer  
@@ -24,7 +22,7 @@ from typing import List, Optional, Tuple, Dict, Any
 from abc import ABC, abstractmethod
 from agentai.rag import RAG
 
-from pycaret.time_series import TSForecastingExperiment
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 
 # abstract class 
 class ImputationStrategy(ABC):
@@ -99,7 +97,7 @@ class MICEImputationStrategy(ImputationStrategy):
         for col in df_numeric.columns:
             df_numeric[f'{col}_lag1'] = df_numeric[col].shift(1)
 
-        imputer = IterativeImputer(
+        imputer = enable_iterative_imputer(
             estimator=RandomForestRegressor(n_estimators=self.n_estimators),
             random_state=self.random_state
         )
@@ -487,130 +485,6 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
     """ Create AutoML tools with the given DataFrame
     """
 
-    # @tool
-    # def pycaret() -> dict:
-    #     """
-    #     Perform time series forecasting using PyCaret.
-    #     Args:
-    #         None
-    #     Returns:
-    #         dict: Contains real values, forecast values, best model info, and logs        
-    #     """
-    #     new_df = df.copy()
-    #     logs = []
-
-    #     # ---------- Input Validation ----------
-    #     if not isinstance(new_df, pd.DataFrame):
-    #         error_message = "Input 'df' must be a pandas DataFrame."
-    #         logs.append(error_message)
-    #         return {"error": error_message, "logs": logs}
-
-    #     if new_df.empty:
-    #         error_message = "Dataset is empty."
-    #         logs.append(error_message)
-    #         return {"error": error_message, "logs": logs}
-
-    #     if not isinstance(test_size, float) or not (0 < test_size < 1):
-    #         error_message = "Invalid 'test_size'. Must be a float between 0 and 1."
-    #         logs.append(error_message)
-    #         return {"error": error_message, "logs": logs}
-
-    #     if not isinstance(target, str):
-    #         error_message = "Invalid 'target'. Must be a string."
-    #         logs.append(error_message)  
-    #         return {"error": error_message, "logs": logs}
-    #     elif target not in new_df.columns:
-    #         error_message = f"Target column '{target}' not found in dataset."
-    #         logs.append(error_message)
-    #         return {"error": error_message, "logs": logs}
-        
-    #     time_cols = (col for col in new_df.columns if 'time' in col.lower() or 'date' in col.lower())
-
-    #     if not time_cols:
-    #         error_message = "No time-related column found in dataset."
-    #         logs.append(error_message)
-    #         return {"error": error_message, "logs": logs}
-
-    #     time_col = next(time_cols)
-    #     logs.append(f"Using '{time_col}' as time index column.")
-
-    #     # ---------- Data Preparation ----------
-    #     try:
-    #         print(f"time_col before to_Datetime => {new_df[time_col].head()}")
-    #         new_df[time_col] = pd.to_datetime(new_df[time_col])
-    #         print(f"time_col after to_Datetime => {new_df[time_col].head()}")
-    #         new_df.set_index(time_col, inplace=True)
-    #         test_size_int = max(1, int(len(new_df) * test_size))
-    #         fh = test_size_int
-
-    #         train = new_df.iloc[:-test_size_int]
-    #         test = new_df.iloc[-test_size_int:]
-
-    #         logs.append(f"Dataset split into train ({len(train)}) and test ({len(test)}) sets.")
-
-    #     except Exception as e:
-    #         error_message = f"Error during data preparation of pycaret tool: {e}"
-    #         logs.append(error_message)
-    #         return {"error": error_message, "logs": logs}
-        
-    #     # ---------- Pycaret Execution ----------
-    #     try:
-    #         # Initialize PyCaret experiment
-    #         exp_auto = TSForecastingExperiment()
-    #         exp_auto.setup(
-    #             data=train,
-    #             target=target,
-    #             enforce_exogenous=True,
-    #             numeric_imputation_target="ffill",
-    #             numeric_imputation_exogenous="ffill",
-    #             session_id=42,
-    #             verbose=False
-    #         )
-
-    #         logs.append("PyCaret experiment setup completed.")
-
-    #         # Compare models
-    #         best = exp_auto.compare_models(verbose=False)
-    #         if best in [None, [], {}]:
-    #             logs.append("compare_models() returned no valid model. Falling back to ARIMA.")
-    #             best = exp_auto.create_model("arima")
-
-    #         logs.append(f"Best model selected: {best}")
-
-    #         # Tune the best model
-    #         best_model = exp_auto.tune_model(
-    #             best,
-    #             choose_better=True,
-    #             n_iter=50,
-    #             fold=3,
-    #             search_algorithm="random",
-    #             tuner_verbose=True,
-    #         )
-
-    #         logs.append("Best model tuned successfully.")
-    #         print(best_model)
-
-    #         # Forecast
-    #         forecast = exp_auto.predict_model(best_model, fh=fh)
-    #         logs.append("Forecasting completed.")
-
-    #         # Return results
-    #         real = test[target].values
-    #         forecast_values = forecast.values.flatten()
-
-    #         return {
-    #             "real": real.tolist(),
-    #             "forecast": forecast_values.tolist(),
-    #             "best_model": str(best_model),
-    #             "params": best_model.get_params(),
-    #             "logs": logs
-    #         }
-
-    #     except Exception as e:
-    #         error_message = f"Error during PyCaret execution: {e}"
-    #         logs.append(error_message)
-    #         return {"error": error_message, "logs": logs}
-
     @tool
     def autogluon_forecast() -> dict:
         """
@@ -674,7 +548,7 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
                 eval_metric="MASE",
                 verbosity=2,
             )
-            predictor.fit(train_data, presets="medium_quality", num_val_windows=1, enable_ensemble=True)
+            predictor.fit(train_data, presets="fast_training", num_val_windows=1, enable_ensemble=True)
             logs.append("AutoGluon training completed.")
         except Exception as e:
             return {"error": f"AutoGluon training failed: {e}", "logs": logs}
@@ -704,7 +578,105 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
             "logs": logs,
         }
 
-    return [autogluon_forecast]
+    @tool
+    def visualize_autogluon_forecast(
+        real: object = None,
+        forecast: object = None,
+        output_path: str = "AutogluonModels/prediction_plot.png",
+        timestamps: object = None,
+        payload: str = None,
+        **kwargs
+    ) -> dict:
+        """
+        Plot forecast vs. real time series values as lines on a single matplotlib plot and save to file.
+
+        Args:
+            real: list OR JSON string OR omitted (if provided via payload)
+            forecast: list OR JSON string OR omitted (if provided via payload)
+            output_path: file path to save the plot (default: AutogluonModels/prediction_plot.png)
+            timestamps: list OR JSON string (optional) OR omitted (if provided via payload)
+            payload: optional JSON string containing keys {"real", "forecast", "timestamps"}
+
+        Returns:
+            {"plot_path": path} on success, or {"error": ..., "log": [...]} on failure.
+        """
+        import matplotlib.pyplot as plt
+        import json as _json
+        logs = []
+
+        # If a single payload string is provided, parse it first
+        payload_dict = {}
+        if isinstance(payload, str):
+            try:
+                payload_dict = _json.loads(payload)
+                if isinstance(payload_dict, dict):
+                    logs.append("Parsed payload JSON successfully.")
+                else:
+                    payload_dict = {}
+            except Exception:
+                payload_dict = {}
+
+        def _extract(name: str, value) -> tuple:
+            # Precedence: explicit arg -> payload dict -> None
+            candidate = value if value is not None else payload_dict.get(name)
+            # Already a list
+            if isinstance(candidate, list):
+                return candidate, None
+            # Try JSON decoding if it's a string
+            if isinstance(candidate, str):
+                try:
+                    parsed = _json.loads(candidate)
+                    if isinstance(parsed, dict):
+                        return parsed.get(name), parsed
+                    if isinstance(parsed, list):
+                        return parsed, None
+                except Exception:
+                    return None, None
+            # Unsupported/None
+            return None, None
+
+        real_list, real_full = _extract("real", real)
+        forecast_list, forecast_full = _extract("forecast", forecast)
+        timestamps_list, ts_full = _extract("timestamps", timestamps)
+
+        # If any of the parsed values included a full dict, try to merge fallback keys
+        for full in (real_full, forecast_full, ts_full):
+            if isinstance(full, dict):
+                if real_list is None and isinstance(full.get("real"), list):
+                    real_list = full.get("real")
+                if forecast_list is None and isinstance(full.get("forecast"), list):
+                    forecast_list = full.get("forecast")
+                if timestamps_list is None and isinstance(full.get("timestamps"), list):
+                    timestamps_list = full.get("timestamps")
+
+        if real_list is None or forecast_list is None:
+            return {"error": "Must provide both real and forecast arrays (as lists or JSON strings or payload).", "log": logs}
+        if len(real_list) != len(forecast_list):
+            return {"error": f"Length mismatch: real has {len(real_list)}, forecast has {len(forecast_list)}", "log": logs}
+
+        x = list(range(len(real_list)))
+        if timestamps_list is not None:
+            if len(timestamps_list) != len(real_list):
+                return {"error": f"Timestamps length ({len(timestamps_list)}) does not match data length ({len(real_list)})", "log": logs}
+            x = timestamps_list
+
+        try:
+            plt.figure(figsize=(10, 5))
+            plt.plot(x, real_list, label="Real", marker="o")
+            plt.plot(x, forecast_list, label="Forecast", marker="x")
+            plt.xlabel("Index" if timestamps_list is None else "Time")
+            plt.ylabel("Value")
+            plt.title("Forecast vs Real")
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            logs.append(f"Saved forecast plot to {output_path}")
+            return {"plot_path": output_path, "log": logs}
+        except Exception as e:
+            return {"error": f"Exception plotting forecast: {e}", "log": logs}
+
+    return [autogluon_forecast, visualize_autogluon_forecast]
 
 @tool
 def retrieve_context(query: str) -> dict:

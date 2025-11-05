@@ -217,6 +217,7 @@ class SupervisorNode(Node):
             "msg": msg_out,
             "logs": logs,
             "subagents_report": None,
+            "is_before_dp": is_before_dp,
             "main_goal": main_goal
         }
 
@@ -323,33 +324,41 @@ class AutoMLNode(Node):
     def __init__(self, executor):
         super().__init__("automl")
         self.executor = executor
+        self.automl_agent = None
 
     def execute(self, state: AgentState) -> dict:
         logs = state.get("logs", [])
         msg = state.get("msg", "")
 
-        # Extract parameters from the state
-        test_size = float(state.get("test_size"))
-        target = state.get("target")
+        # Robust Extraction for test_size
+        test_size_raw = state.get("test_size")
+        try:
+            test_size = float(test_size_raw)
+        except (TypeError, ValueError):
+            error_message = f"Invalid or missing test_size: {test_size_raw!r}. It must be a float between 0 and 1."
+            logs.append(f"[AutoML Node] {error_message}")
+            return {"subagents_report": error_message, "logs": logs}
 
-        # Validate inputs
-        if not isinstance(test_size, (float)) or not (0 < test_size < 1):
+        # Robust Extraction for target
+        target = state.get("target")
+        if not isinstance(target, str) or not target or target not in self.executor.df.columns:
+            error_message = f"Invalid or missing target column: {target!r}. It must be a non-empty string present in the dataset columns."
+            logs.append(f"[AutoML Node] {error_message}")
+            return {"subagents_report": error_message, "logs": logs}
+
+        # Range validation (already robust)
+        if not (0 < test_size < 1):
             error_message = "Invalid test_size. Must be a float between 0 and 1."
             logs.append(f"[AutoML Node] {error_message}")
             return {"subagents_report": error_message, "logs": logs}
 
-        if target not in self.executor.df.columns:
-            error_message = f"Target column '{target}' not found in the dataset."
-            logs.append(f"[AutoML Node] {error_message}")
-            return {"subagents_report": error_message, "logs": logs}
-        
+        if self.automl_agent is None:
+            automl_agent = create_automl_agent(self.executor.df, self.executor.llm, target, test_size)
 
-        automl_agent = create_automl_agent(self.executor.df, self.executor.llm, target, test_size)
-    
         try:
             # Invoke the AutoML agent
             input_message = (
-                f"Based on the following instruction: '{msg}', select the best time series forecasting model and its hyperparameters using PyCaret.\n"
+                f"Based on the following instruction: '{msg}', select the best time series forecasting model and its hyperparameters using automl tools.\n"
             )
 
             response = automl_agent.invoke({"input": input_message})
@@ -364,17 +373,30 @@ class AutoMLNode(Node):
                 return {"subagents_report": report, "logs": logs}
 
             decision = json.loads(json_match.group(0))
-            model = decision.get("model")
-            params = decision.get("params", {})
 
-            report = f"AutoML selected model: {model} with parameters: {params}"
+            # Build a concise report of the most important keys, but preserve all prediction data
+            model = decision.get("best_model") or decision.get("model")
+            real = decision.get("real")
+            forecast = decision.get("forecast")
+            logs_agent = decision.get("logs") or []
+
+            report_lines = []
+            if model:
+                report_lines.append(f"Best Model: {model}")
+            if real is not None and forecast is not None:
+                report_lines.append(f"Forecast on {len(forecast)} points completed.")
+            if logs_agent:
+                report_lines.append(f"Logs: {logs_agent[-2:]}")  # Show last two log lines
+            report = " | ".join(report_lines) if report_lines else str(decision)
+
             logs.append(report)
+            # Return the full original result dict for downstream usage
+            return {"subagents_report": report, "automl_result": decision, "logs": logs}
 
         except Exception as e:
             report = f"[AutoML Node] Error during execution: {e}"
             logs.append(report)
-
-        return {"subagents_report": report, "logs": logs}
+            return {"subagents_report": report, "logs": logs}
 
 class SummarizerNode(Node):
     def __init__(self, executor):

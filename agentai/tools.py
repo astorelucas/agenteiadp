@@ -571,9 +571,105 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
         except Exception:
             best_model = None
 
+        # ---------- Save predictions and visualize ----------
+
+        try:
+            # Criar diretório se não existir
+            os.makedirs("AutogluonForecastResults", exist_ok=True)
+            
+            # Extrair timestamps e valores do treino
+            train_timestamps = train_data.index.get_level_values('timestamp')
+            train_values = train_data[target].values
+            
+            # Pegar os últimos fh pontos do test_data (período de forecast)
+            forecast_timestamps = test_data.index.get_level_values('timestamp')[-fh:]
+            forecast_actuals = test_data[target].iloc[-fh:].values
+            forecast_preds = preds['mean'].values
+            
+            # Salvar dados em CSV primeiro
+            timestamps_str = [ts.strftime('%Y-%m-%d %H:%M:%S') for ts in forecast_timestamps]
+            comparison_df = pd.DataFrame({
+                'timestamp': timestamps_str,
+                'actual': forecast_actuals,
+                'predicted': forecast_preds,
+                'lower_bound': preds['0.1'].values,
+                'upper_bound': preds['0.9'].values
+            })
+
+            csv_path = "AutogluonForecastResults/predictions_and_actuals.csv"
+            comparison_df.to_csv(csv_path, index=False)
+            logs.append(f"Saved predictions to {csv_path}")
+
+            # Criar gráfico com série temporal contínua 
+            fig, ax = plt.subplots(figsize=(20, 6))
+            
+            # Converter todos os timestamps para lista de datetime
+            train_timestamps_list = train_timestamps.to_list()
+            forecast_timestamps_list = forecast_timestamps.to_list()
+            
+            # Plot da linha azul (treino)
+            ax.plot(train_timestamps_list, train_values, 
+                    color='blue', linewidth=1.5, alpha=0.7, label="Training data")
+            
+            # Para eliminar o gap, incluir o último ponto do treino nos arrays de forecast
+            # Criar listas estendidas começando do último ponto do treino
+            extended_forecast_timestamps = [train_timestamps_list[-1]] + forecast_timestamps_list
+            extended_actuals = [train_values[-1]] + list(forecast_actuals)
+            extended_preds = [train_values[-1]] + list(forecast_preds)
+            
+            # Plot da linha verde (valores reais do forecast) - conectada ao treino
+            ax.plot(extended_forecast_timestamps, extended_actuals, 
+                    color='green', linewidth=2, marker='o', markersize=4,
+                    label="Actual values (forecast period)")
+            
+            # Plot da linha vermelha (previsões) - conectada ao treino
+            ax.plot(extended_forecast_timestamps, extended_preds, 
+                    color='red', linewidth=2, marker='x', markersize=5,
+                    label="Forecast", linestyle='--')
+            
+            # Intervalo de confiança - também conectado ao treino
+            extended_lower = [train_values[-1]] + list(preds["0.1"].values)
+            extended_upper = [train_values[-1]] + list(preds["0.9"].values)
+            ax.fill_between(
+                extended_forecast_timestamps, 
+                extended_lower, 
+                extended_upper, 
+                color="red", 
+                alpha=0.2, 
+                label="10%-90% confidence interval"
+            )
+
+            # Linha vertical separando treino e forecast
+            split_time = train_timestamps[-1]
+            ax.axvline(x=split_time, color='black', linestyle='--', 
+                       linewidth=1.5, alpha=0.6, label='Train/Forecast split')
+
+            ax.set_xlabel("Time", fontsize=12)
+            ax.set_ylabel(target, fontsize=12)
+            ax.set_title("AutoGluon Time Series Forecast: Train → Forecast", fontsize=14)
+            ax.legend(loc='best', fontsize=10)
+            ax.grid(True, alpha=0.3)
+            
+            # Configurar formatação do eixo x para timestamps
+            ax.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d %H:%M'))
+            plt.xticks(rotation=45, ha='right')
+            
+            # Ajustar limites do eixo x para mostrar toda a série
+            ax.set_xlim([train_timestamps[0], forecast_timestamps[-1]])
+            
+            plt.tight_layout()
+
+            fig_path = "AutogluonForecastResults/prediction_plot.png"
+            plt.savefig(fig_path, dpi=300, bbox_inches='tight')
+            plt.close()
+
+            logs.append(f"Saved forecast plot to {fig_path}")
+
+        except Exception as e:
+            logs.append(f"Visualization failed: {e}")
+
+
         return {
-            "real": real_tail.tolist(),
-            "forecast": forecast_vals.tolist(),
             "best_model": str(best_model) if best_model is not None else None,
             "logs": logs,
         }
@@ -676,7 +772,7 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
         except Exception as e:
             return {"error": f"Exception plotting forecast: {e}", "log": logs}
 
-    return [autogluon_forecast, visualize_autogluon_forecast]
+    return [autogluon_forecast]
 
 @tool
 def retrieve_context(query: str) -> dict:

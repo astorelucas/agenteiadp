@@ -1,0 +1,77 @@
+Beginning AutoGluon training...
+AutoGluon will save models to 'C:\Users\Gabriel\Documents\agenteiadp\AutogluonModels\ag-20251112_001513'
+=================== System Info ===================
+AutoGluon Version:  1.4.0
+Python Version:     3.11.4
+Operating System:   Windows
+Platform Machine:   AMD64
+Platform Version:   10.0.26100
+CPU Count:          12
+GPU Count:          0
+Memory Avail:       7.22 GB / 15.91 GB (45.4%)
+Disk Space Avail:   121.17 GB / 408.17 GB (29.7%)
+===================================================
+Setting presets to: fast_training
+
+Fitting with arguments:
+{'enable_ensemble': True,
+ 'eval_metric': MASE,
+ 'hyperparameters': 'very_light',
+ 'known_covariates_names': [],
+ 'num_val_windows': 1,
+ 'prediction_length': 3,
+ 'quantile_levels': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+ 'random_seed': 123,
+ 'refit_every_n_windows': 1,
+ 'refit_full': False,
+ 'skip_model_selection': False,
+ 'target': 'temperature',
+ 'verbosity': 2}
+
+Inferred time series frequency: 'H'
+Provided train_data has 15 rows, 1 time series. Median time series length is 15 (min=15, max=15). 
+
+Provided data contains following columns:
+	target: 'temperature'
+
+AutoGluon will gauge predictive performance using evaluation metric: 'MASE'
+	This metric's sign has been flipped to adhere to being higher_is_better. The metric score can be multiplied by -1 to get the metric value.
+===================================================
+
+Starting training. Start time is 2025-11-11 21:15:13
+Models that will be trained: ['Naive', 'SeasonalNaive', 'RecursiveTabular', 'DirectTabular', 'ETS', 'Theta']
+Training timeseries model Naive. 
+	-1.4000       = Validation score (-MASE)
+	0.02    s     = Training runtime
+	1.96    s     = Validation (prediction) runtime
+Training timeseries model SeasonalNaive. 
+	-1.4000       = Validation score (-MASE)
+	0.01    s     = Training runtime
+	1.57    s     = Validation (prediction) runtime
+Training timeseries model RecursiveTabular. 
+	Time series in the dataset are too short for chosen differences [24]. Setting differences to [1].
+	-0.2250       = Validation score (-MASE)
+	0.23    s     = Training runtime
+	0.03    s     = Validation (prediction) runtime
+Training timeseries model DirectTabular. 
+	-8.8889       = Validation score (-MASE)
+	0.24    s     = Training runtime
+	0.04    s     = Validation (prediction) runtime
+Training timeseries model ETS. 
+	-0.0926       = Validation score (-MASE)
+	0.01    s     = Training runtime
+	2.27    s     = Validation (prediction) runtime
+Training timeseries model Theta. 
+	-0.5619       = Validation score (-MASE)
+	0.01    s     = Training runtime
+	2.27    s     = Validation (prediction) runtime
+Fitting simple weighted ensemble.
+	Ensemble weights: {'ETS': 0.71, 'RecursiveTabular': 0.29}
+	-0.0506       = Validation score (-MASE)
+	0.14    s     = Training runtime
+	2.30    s     = Validation (prediction) runtime
+Training complete. Models trained: ['Naive', 'SeasonalNaive', 'RecursiveTabular', 'DirectTabular', 'ETS', 'Theta', 'WeightedEnsemble']
+Total runtime: 9.14 s
+Best model: WeightedEnsemble
+Best model score: -0.0506
+Model not specified in predict, will default to the model with the best validation score: WeightedEnsemble

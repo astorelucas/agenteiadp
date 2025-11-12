@@ -13,7 +13,7 @@ API_KEY = os.getenv("DEEPINFRA_API_KEY")
 class RAG():
 
     #fazendo inicialização lazy, pra evitar problemas
-    def __init__(self, document="./agentai/teste_rag.txt", collection_name="long-term-memory", persist_directory=".\FAISS_DB"):
+    def __init__(self, document="./agentai/base_rag.txt", collection_name="long-term-memory", persist_directory="./agentai/FAISS_DB"):
         self.document = document 
         self.collection_name = collection_name
         self.persist_directory = persist_directory

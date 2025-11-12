@@ -194,25 +194,41 @@ def create_feedback_agent(llm) -> AgentExecutor:
     return create_react_agent(
         model=llm,
         prompt="""
-        You are a FeedbackAgent. Your role is to analyze logs and summaries from a workflow execution and decide if there is valuable **knowledge to store for future use**.
+        You are a FeedbackAgent. Your role is to analyze logs and summaries to identify valuable knowledge, check if it's redundant, and decide if it should be stored.
 
-        Rules:
-        - Identify practical lessons, solutions to errors, or strategies that improved results.
-          Examples:
-            * "AutoML training was poor but improved after adding feature X."
-            * "Python error Y can be avoided by doing Z."
-            * "For dataset type X, imputation technique Z performed poorly."
-        - Ignore trivial steps, repeated errors without resolution, or transient issues.
-        - Output ONLY a valid JSON object:
-          {
-            "store": true/false,
-            "insight": "short, clear statement of the learned knowledge (if store=true)"
-          }
+        You have one tool:
+        - **retrieve_context**: Use this to check if a potential insight already exists in the knowledge base.
 
-        If nothing valuable was learned, return:
+        **Workflow:**
+        1.  Analyze the logs and identify a concise, practical insight (e.g., "AutoML error X was fixed by doing Y").
+        2.  If no insight is found, stop and output `{"store": false, "insight": ""}`.
+        3.  If an insight is found, YOU MUST use the `retrieve_context` tool with the insight as the query.
+        4.  Analyze the tool's output:
+            - If the retrieved context is *not* helpful or *very different* from your insight, the insight is new.
+            - If the retrieved context is *very similar* or *identical*, the insight is redundant.
+        5.  Based on your analysis, output ONLY a valid JSON object with your final decision:
+            {
+              "store": true/false,
+              "insight": "short, clear statement of the learned knowledge (if store=true)"
+            }
+
+        **Example Thought Process:**
+        1.  Logs show 'Error: M' was fixed by 'Solution: S'.
+        2.  My potential insight is: "Error M is fixed by Solution S".
+        3.  Action: `retrieve_context(query="Error M is fixed by Solution S")`
+        4.  Observation: "RAG retrieve failed..." or "No relevant solution..." -> My insight is new.
+        5.  Final Decision: `{"store": true, "insight": "Error M is fixed by Solution S"}`
+
+        **Example 2 (Redundant):**
+        1.  Insight: "Error M is fixed by Solution S".
+        2.  Action: `retrieve_context(query="Error M is fixed by Solution S")`
+        3.  Observation: "...[doc]... Error M is resolved by Solution S..." -> My insight is a duplicate.
+        4.  Final Decision: `{"store": false, "insight": ""}`
+
+        If nothing valuable was learned from the start, return:
           {"store": false, "insight": ""}
         """,
-        tools=[]
+        tools=[retrieve_context]
     )
     
 def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:

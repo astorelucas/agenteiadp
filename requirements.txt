@@ -1,5 +1,4 @@
 langchain>=0.3.27
-wikipedia>=1.4.0
 langchain-community>=0.3.29
 langchain-openai>=0.3.32
 langchain-anthropic>=0.3.19
@@ -15,7 +14,7 @@ langgraph>=0.6.7
 langgraph-supervisor>=0.0.29
 grandalf>=0.8
 pandas>=1.5.3
-numpy>=1.23.5
+numpy>=1.26.0
 scikit-learn>=1.2.2
 tabulate>=0.9.0
 missingpy>=0.2.0
@@ -23,6 +22,6 @@ pyppeteer>=2.0.0
 matplotlib>=3.7.1
 seaborn>=0.12.2
 streamlit>=1.25.0
-chromadb>=0.4.0
-langchain-chroma==0.2.6
-pycaret>=3.3.0
+autogluon
+langchain-faiss
+faiss-cpu

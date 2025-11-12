@@ -485,6 +485,221 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
     """ Create AutoML tools with the given DataFrame
     """
 
+    # ========== Helper Functions ==========
+    # ideia principal é modularizar a tool para reutilização e clareza
+    # Ainda vou fazer (TODO): tornar o forecast também modularizado e criar classes para as métricas (MAE, RMSE, MAPE, etc)
+    
+    
+    def _save_predictions_csv(forecast_timestamps, forecast_actuals, forecast_preds, preds, output_path, logs):
+        """Save predictions and actuals to CSV file."""
+        try:
+            timestamps_str = [ts.strftime('%Y-%m-%d %H:%M:%S') for ts in forecast_timestamps]
+            comparison_df = pd.DataFrame({
+                'timestamp': timestamps_str,
+                'actual': forecast_actuals,
+                'predicted': forecast_preds,
+                'lower_bound': preds['0.1'].values,
+                'upper_bound': preds['0.9'].values
+            })
+
+            csv_path = os.path.join(output_path, "predictions_and_actuals.csv")
+            comparison_df.to_csv(csv_path, index=False)
+            logs.append(f"Saved predictions to {csv_path}")
+            return True
+        except Exception as e:
+            logs.append(f"CSV save failed: {e}")
+            return False
+
+    def _plot_main_forecast(train_timestamps, train_values, forecast_timestamps, forecast_actuals, 
+                           forecast_preds, preds, target, output_path, logs):
+        """Create main time series forecast plot with train and forecast periods."""
+        try:
+            fig, ax = plt.subplots(figsize=(20, 6))
+            
+            # Converter timestamps para listas
+            train_timestamps_list = train_timestamps.to_list()
+            forecast_timestamps_list = forecast_timestamps.to_list()
+            
+            # Plot treino
+            ax.plot(train_timestamps_list, train_values, 
+                    color='blue', linewidth=1.5, alpha=0.7, label="Training data")
+            
+            # Criar arrays estendidos para conectar treino com forecast
+            extended_forecast_timestamps = [train_timestamps_list[-1]] + forecast_timestamps_list
+            extended_actuals = [train_values[-1]] + list(forecast_actuals)
+            extended_preds = [train_values[-1]] + list(forecast_preds)
+            
+            # Plot valores reais do forecast
+            ax.plot(extended_forecast_timestamps, extended_actuals, 
+                    color='green', linewidth=2, marker='o', markersize=4,
+                    label="Actual values (forecast period)")
+            
+            # Plot previsões
+            ax.plot(extended_forecast_timestamps, extended_preds, 
+                    color='red', linewidth=2, marker='x', markersize=5,
+                    label="Forecast", linestyle='--')
+
+            # Linha vertical de separação
+            split_time = train_timestamps[-1]
+            ax.axvline(x=split_time, color='black', linestyle='--', 
+                      linewidth=1.5, alpha=0.6, label='Train/Forecast split')
+
+            ax.set_xlabel("Time", fontsize=12)
+            ax.set_ylabel(target, fontsize=12)
+            ax.set_title("AutoGluon Time Series Forecast", fontsize=14)
+            ax.legend(loc='best', fontsize=10)
+            ax.grid(True, alpha=0.3)
+            ax.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d %H:%M'))
+            plt.xticks(rotation=45, ha='right')
+            ax.set_xlim([train_timestamps[0], forecast_timestamps[-1]])
+            
+            plt.tight_layout()
+            fig_path = os.path.join(output_path, "prediction_plot.png")
+            plt.savefig(fig_path, dpi=300, bbox_inches='tight')
+            plt.close()
+
+            logs.append(f"Saved forecast plot to {fig_path}")
+            return True
+        except Exception as e:
+            logs.append(f"Main forecast plot failed: {e}")
+            return False
+
+    def _plot_forecast_vs_actual(forecast_timestamps, forecast_actuals, forecast_preds, 
+                                 preds, target, output_path, logs):
+        """Create isolated forecast period comparison plot."""
+        try:
+            fig_forecast, ax_forecast = plt.subplots(figsize=(12, 6))
+            
+            forecast_timestamps_list = forecast_timestamps.to_list()
+            
+            ax_forecast.plot(forecast_timestamps_list, forecast_actuals, 
+                           color='green', linewidth=2, marker='o', markersize=5,
+                           label="Actual values")
+            ax_forecast.plot(forecast_timestamps_list, forecast_preds, 
+                           color='red', linewidth=2, marker='x', markersize=5,
+                           label="Forecast", linestyle='--')
+            
+            ax_forecast.set_xlabel("Time", fontsize=12)
+            ax_forecast.set_ylabel(target, fontsize=12)
+            ax_forecast.set_title("Forecast Period: Predicted vs Actual", fontsize=14)
+            ax_forecast.legend(loc='best', fontsize=10)
+            ax_forecast.grid(True, alpha=0.3)
+            ax_forecast.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d %H:%M'))
+            plt.xticks(rotation=45, ha='right')
+            
+            plt.tight_layout()
+            forecast_plot_path = os.path.join(output_path, "forecast_vs_actual.png")
+            plt.savefig(forecast_plot_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            logs.append(f"Saved forecast vs actual plot to {forecast_plot_path}")
+            return True
+        except Exception as e:
+            logs.append(f"Forecast vs actual plot failed: {e}")
+            return False
+
+    def _plot_error_histogram(forecast_actuals, forecast_preds, output_path, logs):
+        """Create error distribution histogram with statistics."""
+        try:
+            errors = forecast_preds - forecast_actuals
+            
+            fig_hist, ax_hist = plt.subplots(figsize=(10, 6))
+            
+            n, bins, patches = ax_hist.hist(errors, bins=20, color='skyblue', 
+                                            edgecolor='black', alpha=0.7, density=True)
+            
+            # Curva normal
+            mu, std = errors.mean(), errors.std()
+            from scipy.stats import norm
+            xmin, xmax = ax_hist.get_xlim()
+            x = np.linspace(xmin, xmax, 100)
+            p = norm.pdf(x, mu, std)
+            ax_hist.plot(x, p, 'r-', linewidth=2, label=f'Normal dist. (μ={mu:.2f}, σ={std:.2f})')
+            
+            # Métricas
+            mae = np.abs(errors).mean()
+            rmse = np.sqrt((errors**2).mean())
+            
+            ax_hist.axvline(x=0, color='green', linestyle='--', linewidth=2, label='Perfect forecast')
+            ax_hist.axvline(x=mu, color='red', linestyle='--', linewidth=2, label=f'Mean error: {mu:.2f}')
+            
+            ax_hist.set_xlabel("Prediction Error", fontsize=12)
+            ax_hist.set_ylabel("Density", fontsize=12)
+            ax_hist.set_title(f"Error Distribution (MAE={mae:.2f}, RMSE={rmse:.2f})", fontsize=14)
+            ax_hist.legend(loc='best', fontsize=10)
+            ax_hist.grid(True, alpha=0.3, axis='y')
+            
+            plt.tight_layout()
+            hist_path = os.path.join(output_path, "error_histogram.png")
+            plt.savefig(hist_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            logs.append(f"Saved error histogram to {hist_path}")
+            return True
+        except Exception as e:
+            logs.append(f"Error histogram failed: {e}")
+            return False
+
+    def _plot_error_over_time(forecast_timestamps, forecast_actuals, forecast_preds, output_path, logs):
+        """Create error over time plot with absolute and percentage errors."""
+        try:
+            errors = forecast_preds - forecast_actuals
+            forecast_timestamps_list = forecast_timestamps.to_list()
+            
+            fig_error, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+            
+            # Erros absolutos
+            ax1.plot(forecast_timestamps_list, errors, color='blue', linewidth=1.5, 
+                    marker='o', markersize=4, label='Prediction error')
+            ax1.axhline(y=0, color='green', linestyle='--', linewidth=2, label='Perfect forecast')
+            
+            if len(errors) >= 3:
+                window = min(5, len(errors) // 3)
+                ma = pd.Series(errors).rolling(window=window, center=True).mean()
+                ax1.plot(forecast_timestamps_list, ma, color='red', linewidth=2, 
+                        linestyle='--', label=f'Moving avg (window={window})')
+            
+            ax1.set_xlabel("Time", fontsize=12)
+            ax1.set_ylabel("Error", fontsize=12)
+            ax1.set_title("Prediction Error Over Time", fontsize=14)
+            ax1.legend(loc='best', fontsize=10)
+            ax1.grid(True, alpha=0.3)
+            ax1.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d %H:%M'))
+            plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right')
+            
+            # Erros percentuais
+            pct_errors = 100 * errors / forecast_actuals
+            ax2.plot(forecast_timestamps_list, pct_errors, color='purple', linewidth=1.5,
+                    marker='s', markersize=4, label='Percentage error')
+            ax2.axhline(y=0, color='green', linestyle='--', linewidth=2)
+            
+            if len(pct_errors) >= 3:
+                window = min(5, len(pct_errors) // 3)
+                ma_pct = pd.Series(pct_errors).rolling(window=window, center=True).mean()
+                ax2.plot(forecast_timestamps_list, ma_pct, color='red', linewidth=2,
+                        linestyle='--', label=f'Moving avg (window={window})')
+            
+            ax2.set_xlabel("Time", fontsize=12)
+            ax2.set_ylabel("Error (%)", fontsize=12)
+            ax2.set_title("Percentage Error Over Time", fontsize=14)
+            ax2.legend(loc='best', fontsize=10)
+            ax2.grid(True, alpha=0.3)
+            ax2.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d %H:%M'))
+            plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
+            
+            plt.tight_layout()
+            error_time_path = os.path.join(output_path, "error_over_time.png")
+            plt.savefig(error_time_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            logs.append(f"Saved error over time plot to {error_time_path}")
+            return True
+        except Exception as e:
+            logs.append(f"Error over time plot failed: {e}")
+            return False
+
+    # ========== Main Tool ==========
+
     @tool
     def autogluon_forecast() -> dict:
         """
@@ -494,6 +709,11 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
         """
         logs = []
         new_df = df.copy()
+        
+        # ---------- Output path definition ----------
+        output_path = "agentai/results/forecast/test/" 
+        os.makedirs(output_path, exist_ok=True)
+        logs.append(f"Output path set to: {output_path}")
 
         # ---------- Validation ----------
         if not isinstance(new_df, pd.DataFrame):
@@ -571,112 +791,33 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
         except Exception:
             best_model = None
 
+        # ---------- Extract data for visualization ----------
+        train_timestamps = train_data.index.get_level_values('timestamp')
+        train_values = train_data[target].values
+        forecast_timestamps = test_data.index.get_level_values('timestamp')[-fh:]
+        forecast_actuals = test_data[target].iloc[-fh:].values
+        forecast_preds = preds['mean'].values
+
+        # ---------- Save CSV ----------
+        _save_predictions_csv(forecast_timestamps, forecast_actuals, forecast_preds, preds, output_path, logs)
+
+        # ---------- Generate Plots ----------
+        _plot_main_forecast(train_timestamps, train_values, forecast_timestamps, 
+                           forecast_actuals, forecast_preds, preds, target, output_path, logs)
+        
+        _plot_forecast_vs_actual(forecast_timestamps, forecast_actuals, forecast_preds, 
+                                preds, target, output_path, logs)
+        
+        _plot_error_histogram(forecast_actuals, forecast_preds, output_path, logs)
+        
+        _plot_error_over_time(forecast_timestamps, forecast_actuals, forecast_preds, output_path, logs)
+
         return {
-            "real": real_tail.tolist(),
-            "forecast": forecast_vals.tolist(),
             "best_model": str(best_model) if best_model is not None else None,
             "logs": logs,
         }
 
-    @tool
-    def visualize_autogluon_forecast(
-        real: object = None,
-        forecast: object = None,
-        output_path: str = "AutogluonModels/prediction_plot.png",
-        timestamps: object = None,
-        payload: str = None,
-        **kwargs
-    ) -> dict:
-        """
-        Plot forecast vs. real time series values as lines on a single matplotlib plot and save to file.
-
-        Args:
-            real: list OR JSON string OR omitted (if provided via payload)
-            forecast: list OR JSON string OR omitted (if provided via payload)
-            output_path: file path to save the plot (default: AutogluonModels/prediction_plot.png)
-            timestamps: list OR JSON string (optional) OR omitted (if provided via payload)
-            payload: optional JSON string containing keys {"real", "forecast", "timestamps"}
-
-        Returns:
-            {"plot_path": path} on success, or {"error": ..., "log": [...]} on failure.
-        """
-        import matplotlib.pyplot as plt
-        import json as _json
-        logs = []
-
-        # If a single payload string is provided, parse it first
-        payload_dict = {}
-        if isinstance(payload, str):
-            try:
-                payload_dict = _json.loads(payload)
-                if isinstance(payload_dict, dict):
-                    logs.append("Parsed payload JSON successfully.")
-                else:
-                    payload_dict = {}
-            except Exception:
-                payload_dict = {}
-
-        def _extract(name: str, value) -> tuple:
-            # Precedence: explicit arg -> payload dict -> None
-            candidate = value if value is not None else payload_dict.get(name)
-            # Already a list
-            if isinstance(candidate, list):
-                return candidate, None
-            # Try JSON decoding if it's a string
-            if isinstance(candidate, str):
-                try:
-                    parsed = _json.loads(candidate)
-                    if isinstance(parsed, dict):
-                        return parsed.get(name), parsed
-                    if isinstance(parsed, list):
-                        return parsed, None
-                except Exception:
-                    return None, None
-            # Unsupported/None
-            return None, None
-
-        real_list, real_full = _extract("real", real)
-        forecast_list, forecast_full = _extract("forecast", forecast)
-        timestamps_list, ts_full = _extract("timestamps", timestamps)
-
-        # If any of the parsed values included a full dict, try to merge fallback keys
-        for full in (real_full, forecast_full, ts_full):
-            if isinstance(full, dict):
-                if real_list is None and isinstance(full.get("real"), list):
-                    real_list = full.get("real")
-                if forecast_list is None and isinstance(full.get("forecast"), list):
-                    forecast_list = full.get("forecast")
-                if timestamps_list is None and isinstance(full.get("timestamps"), list):
-                    timestamps_list = full.get("timestamps")
-
-        if real_list is None or forecast_list is None:
-            return {"error": "Must provide both real and forecast arrays (as lists or JSON strings or payload).", "log": logs}
-        if len(real_list) != len(forecast_list):
-            return {"error": f"Length mismatch: real has {len(real_list)}, forecast has {len(forecast_list)}", "log": logs}
-
-        x = list(range(len(real_list)))
-        if timestamps_list is not None:
-            if len(timestamps_list) != len(real_list):
-                return {"error": f"Timestamps length ({len(timestamps_list)}) does not match data length ({len(real_list)})", "log": logs}
-            x = timestamps_list
-
-        try:
-            plt.figure(figsize=(10, 5))
-            plt.plot(x, real_list, label="Real", marker="o")
-            plt.plot(x, forecast_list, label="Forecast", marker="x")
-            plt.xlabel("Index" if timestamps_list is None else "Time")
-            plt.ylabel("Value")
-            plt.title("Forecast vs Real")
-            plt.legend()
-            plt.tight_layout()
-            plt.savefig(output_path, dpi=300, bbox_inches='tight')
-            plt.close()
-            logs.append(f"Saved forecast plot to {output_path}")
-            return {"plot_path": output_path, "log": logs}
-        except Exception as e:
-            return {"error": f"Exception plotting forecast: {e}", "log": logs}
-
-    return [autogluon_forecast, visualize_autogluon_forecast]
+    return [autogluon_forecast]
 
 @tool
 def retrieve_context(query: str) -> dict:

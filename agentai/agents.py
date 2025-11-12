@@ -293,38 +293,28 @@ def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float) ->
         allow_dangerous_code=True,
         extra_tools=automl_tools,
         prefix="""
-        You are an AutoML Agent specialized in time series forecasting. You have access to the autogluon_forecast tool.
+        You are an AutoML Agent specialized in time series forecasting. You have access to autogluon_forecast.
 
-        **CRITICAL INSTRUCTIONS:**
-        1. Call the autogluon_forecast tool to perform forecasting.
-        2. After receiving the forecast results, IMMEDIATELY call visualize_autogluon_forecast with the "real" and "forecast" arrays from the tool output.
-        3. Your FINAL ANSWER must be a valid JSON object (no markdown, no code blocks, no text before or after).
+        Your job is to call exactly ONE of these tools. NEVER run forecasting yourself or return a result without using a tool.
 
-        **OUTPUT FORMAT:**
-        Your final answer must be ONLY a JSON object with these fields:
+        The output from these tools will include at least:
+            - "best_model": name/identifier of the best-performing model
+            - "logs": list of log strings describing key pipeline and model steps
+            - "plot_path": path to the saved visualization image (if plotting is successful)
+
+        ALWAYS return a single well-formatted JSON object with these fields. Only include additional fields if present in the tool output. Do not synthesize or invent fields.
+
+        Example of a correct output:
         {{
-            "real": [array of real values from autogluon_forecast output],
-            "forecast": [array of forecast values from autogluon_forecast output],
-            "best_model": "model name from autogluon_forecast output",
-            "logs": [array of log strings from autogluon_forecast output],
-            "plot_path": "path from visualize_autogluon_forecast output"
+            "best_model": "NaiveMean",
+            "logs": ["Using 'date' as timestamp column.", "Split data into train (100) and test (25).", ...],
+            "plot_path": "AutogluonModels/prediction_plot.png"
         }}
 
-        **IMPORTANT:**
-        - If any tool fails, return a JSON with an "error" field: {{"error": "description of what went wrong"}}
-        - NEVER output empty strings or non-JSON text
-        - NEVER use markdown code fences (```json or ```)
-        - ALWAYS output valid JSON that can be parsed
-        - Extract arrays directly from tool outputs - do not modify them
+        Do NOT include a 'params' field unless it comes directly from the tool's output. Do NOT output markdown or code fencing; return pure JSON only.
 
-        **Example workflow:**
-        1. Action: autogluon_forecast
-        2. Observation: {{"real": [1,2,3], "forecast": [1.1,2.1,3.1], "best_model": "ETS", "logs": [...]}}
-        3. Action: visualize_autogluon_forecast
-           Action Input: {{"real": [1,2,3], "forecast": [1.1,2.1,3.1], "output_path": "AutogluonModels/prediction_plot.png"}}
-        4. Observation: {{"plot_path": "AutogluonModels/prediction_plot.png", "log": [...]}}
-        5. Final Answer: {{"real": [1,2,3], "forecast": [1.1,2.1,3.1], "best_model": "ETS", "logs": [...], "plot_path": "AutogluonModels/prediction_plot.png"}}
+        If the main tool (autogluon_forecast) fails due to missing dependencies, clearly indicate it in logs
 
-        Now start by calling autogluon_forecast.
+        Think step by step: choose the appropriate tool, run it, check for errors, then call visualize_autogluon_forecast and output the full result as JSON just as returned by the tools.
         """
   )

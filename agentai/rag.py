@@ -1,89 +1,128 @@
 from dotenv import load_dotenv
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import DeepInfraEmbeddings
 from langchain_community.document_loaders import TextLoader
 import os
-
-# import warnings
-# warnings.filterwarnings("ignore", category=DeprecationWarning)
+import threading
 
 load_dotenv()
 API_KEY = os.getenv("DEEPINFRA_API_KEY")
 
 
 class RAG():
-    def __init__(self, persist_directory="./memoryDB", document="./agentai/teste_rag.txt"):
+
+    #fazendo inicialização lazy, pra evitar problemas
+    def __init__(self, document="./agentai/base_rag.txt", collection_name="long-term-memory", persist_directory="./agentai/FAISS_DB"):
         self.document = document 
+        self.collection_name = collection_name
         self.persist_directory = persist_directory
-        self.collection_name = "long-term-memory"
-        self.embedding = DeepInfraEmbeddings(model_id="BAAI/bge-base-en-v1.5", deepinfra_api_token=API_KEY)
-        self.retriever = None
+        self.index_path = os.path.join(self.persist_directory, self.collection_name)
+        
+        self._embedding = None
+        self._vectorstore = None
+        self._retriever = None
+        
+        # evitar o fim da execução por problema de threading
+        self._init_lock = threading.Lock()
 
-        if os.path.exists(self.persist_directory) and os.path.isdir(self.persist_directory):
-            print(f"Directory '{self.persist_directory}' found. Loading existing database.")
-            self._load()
-        else:
-            print(f"Directory '{self.persist_directory}' not found. Creating a new one.")
-            self._build()
-     
+    def _initialize_components(self):
+        if self._retriever:
+            return
 
-    def _build(self):
+        with self._init_lock:
+            if self._retriever:
+                return
+
+            try:
+                self._embedding = DeepInfraEmbeddings(model_id="BAAI/bge-base-en-v1.5", deepinfra_api_token=API_KEY)
+
+                if os.path.exists(self.index_path):
+                    print(f"Diretório de FAISS já existente {self.index_path}")
+                    self._vectorstore = FAISS.load_local(
+                        self.index_path, 
+                        self._embedding,
+                        allow_dangerous_deserialization=True
+                    )
+                else:
+                    print(f"Nenhum índice FAISS encontrado. Construindo novo índice de {self.document}")
+                    self._build_from_docs()
+
+                if self._vectorstore:
+                    self._retriever = self._vectorstore.as_retriever(search_kwargs={'k': 5})
+                else:
+                    print("Falha ao inicializar o vectorstore.")
+            
+            except Exception as e:
+                print(f"Erro durante a inicialização do RAG: {e}")
+                self._embedding = None
+                self._vectorstore = None
+                self._retriever = None
+
+    def _build_from_docs(self):
         if not os.path.exists(self.document):
-            print(f"Error: Document file not found at {self.document}")
+            print(f"Erro, documento não encontrado em {self.document}")
             return
         
         try:
             loader = TextLoader(self.document, encoding="utf-8")
             docs = loader.load()
             
-            # create chunks
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
             doc_splits = text_splitter.split_documents(docs)
             
-            # using vectorStore Chroma
-            self.vectorstore = Chroma.from_documents( # OR chroma_client.create_collection() IF NOT FROM DOCUMENTS
-                documents=doc_splits,
-                collection_name=self.collection_name,
-                embedding = self.embedding,
-                persist_directory=self.persist_directory,
-            )
-
-            self.retriever = self.vectorstore.as_retriever(search_kwargs={'k': 5})
-            print("Vector database built.\n")
+            self._vectorstore = FAISS.from_documents(doc_splits, self._embedding)
+            
+            os.makedirs(self.persist_directory, exist_ok=True)
+            self._vectorstore.save_local(self.index_path)
+            
         except Exception as e:
-            print(f"Error while building vector database: {e}")
+            print(f"Erro ao construir o índice FAISS: {e}")
 
-    def _load(self):
-        try:
-            self.vectorstore = Chroma(collection_name=self.collection_name, persist_directory=self.persist_directory, embedding_function=self.embedding)
-            self.retriever = self.vectorstore.as_retriever(search_kwargs={'k': 5})
-            print("Vector database loaded successfully.")
-        except Exception as e:
-            print(f"Error while loading vector database: {str(e)}")
+    # @property é bom pra evitar inicializações inválidos e evitar dependência de IFs.
+    @property
+    def retriever(self):
+        if self._retriever is None:
+            self._initialize_components()
+        return self._retriever
 
+    @property
+    def vectorstore(self):
+        if self._vectorstore is None:
+            self._initialize_components()
+        return self._vectorstore
 
     def store(self, text_content: str):
+        if self.vectorstore is None:
+             print("Erro: Vectorstore não pôde ser inicializado. 'store' falhou.")
+             return
+
         splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)        
         chunks = splitter.split_text(text_content)
-        self.vectorstore.add_texts(texts=chunks)
         
-        self.retriever = self.vectorstore.as_retriever(search_kwargs={'k': 5})
-    
+        self.vectorstore.add_texts(texts=chunks)
+        self.vectorstore.save_local(self.index_path)
+        self._retriever = self.vectorstore.as_retriever(search_kwargs={'k': 5})
         print("Novos documentos foram adicionados e o retriever foi atualizado.")
 
     
     def retrieve(self, query: str):
-        instructional_query = f"Represent this sentence for searching relevant passages: {query}"
-        
-        print(f"\n\n RAG EXECUTED WITH INSTRUCTIONAL QUERY: '{instructional_query}'\n")
-        
-        results = self.retriever.invoke(instructional_query)
-        
-        if not results:
-            print("No results found in RAG.\n\n")
-            return "No relevant solution was found in the knowledge base. Please proceed with an alternative strategy."
+        if self.retriever is None:
+             return "RAG retriever failed to initialize."
 
-        print(f"Rag result:\n{results}\n")
-        return "\n".join([doc.page_content for doc in results])
-    
+        instructional_query = f"Represent this sentence for searching relevant passages: {query}"
+        print(f"\n\n[RAG] EXECUTED WITH INSTRUCTIONAL QUERY: '{instructional_query}'\n")
+        
+        try:
+            results = self.retriever.invoke(instructional_query)
+            
+            if not results:
+                print("No results found in RAG.\n\n")
+                return "No relevant solution was found in the knowledge base."
+
+            print(f"Rag result:\n{results}\n")
+            return "\n".join([doc.page_content for doc in results])
+        
+        except Exception as e:
+            print(f"[RAG] Erro durante a execução de 'invoke': {e}")
+            return f"RAG retrieve failed during invoke: {e}"

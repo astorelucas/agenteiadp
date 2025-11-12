@@ -2,7 +2,7 @@ import json
 import re
 from langchain.callbacks.base import BaseCallbackHandler
 from typing import Dict, Any
-
+import pandas as pd
 
 from langchain_core.messages import HumanMessage
 from agentai.modules.common import AgentState
@@ -13,10 +13,10 @@ from agentai.agents import (
     create_imputator_agent,
     create_plotter_agent,
     create_feedback_agent,
-    create_feature_engineering_agent
+    create_feature_engineering_agent,
+    create_automl_agent,
+    create_summarizer_agent
 )
-
-
 
 class Node:
     def __init__(self, name: str, executor=None):
@@ -37,7 +37,6 @@ class Node:
     def __call__(self, state: AgentState) -> dict:
         return self.run(state)
 
-
 class AgentThoughtCollector(BaseCallbackHandler):
     """
         Callback para coletar os pensamentos internos de uma a├º├úo de agente.
@@ -50,32 +49,27 @@ class AgentThoughtCollector(BaseCallbackHandler):
         if hasattr(action, 'log'):
             self.thoughts.append(action.log)
 
-
 class FeatureEngineeringNode(Node):
     def __init__(self, executor):
         super().__init__("feature_engineer")
         self.executor = executor
+        self.agent = create_feature_engineering_agent(self.executor.df, self.executor.llm)
 
     def execute(self, state: AgentState) -> dict:
         logs = state.get("logs", [])
         msg = state.get("msg", "")
-        df = getattr(self.executor, "df", None)
         
         thought_collector = AgentThoughtCollector()
 
-
-
-        if df is None:
+        if self.executor.df is None:
             error_report = "[FeatureEngineeringNode] No DataFrame available on executor."
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
 
         try:
-            agent = create_feature_engineering_agent(df, self.executor.llm)
-            response = agent.invoke({"input": msg}, config={"callbacks": [thought_collector]})
+            
+            response = self.agent.invoke({"input": msg}, config={"callbacks": [thought_collector]})
             report = response.get("output", "") or str(response)
-
-            self.executor.df = df  
 
             full_thought_process = thought_collector.thoughts
             
@@ -92,20 +86,17 @@ class FeatureEngineeringNode(Node):
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
 
-
-
 class PandasNode(Node):
     """Run a pandas-capable inspection agent against the executor.df"""
     def __init__(self, executor):
         super().__init__("inspect")
         self.executor = executor
+        self.agent = create_pandas_agent(self.executor.df, self.executor.llm)
 
     def execute(self, state: AgentState) -> dict:
         msg = state.get("msg", "")
         logs = state.get("logs", [])
         max_retries = 2
-
-        agent = create_pandas_agent(self.executor.df, self.executor.llm)
         current_input = msg
         report = "\n[Pandas Node] "
 
@@ -114,7 +105,7 @@ class PandasNode(Node):
 
         for attempt in range(max_retries + 1):
             try:
-                response = agent.invoke(
+                response = self.agent.invoke(
                     {"input": current_input},
                     config={"callbacks": [thought_collector]}
                 )
@@ -139,18 +130,17 @@ class PandasNode(Node):
 
         return {"subagents_report": complete_report, "logs": logs}
 
-
 class ImputatorNode(Node):
     def __init__(self, executor):
         super().__init__("imputator")
         self.executor = executor
+        self.imputator_agent = create_imputator_agent(self.executor.llm)
 
     def execute(self, state: AgentState) -> dict:
         context = state.get("msg", "")
         logs = state.get("logs", [])
-        
-        imputator_agent = create_imputator_agent(self.executor.llm)
-        response = imputator_agent.invoke({"messages": [HumanMessage(content=context)]})
+    
+        response = self.imputator_agent.invoke({"messages": [HumanMessage(content=context)]})
         raw_output = str(response.get("messages", [])[-1].content)
         json_str_match = re.search(r'\{.*\}', raw_output, re.DOTALL)
 
@@ -180,15 +170,13 @@ class ImputatorNode(Node):
         logs.append(report)
         return {"subagents_report": report, "logs": logs}
 
-
 class SupervisorNode(Node):
     def __init__(self, executor):
         super().__init__("supervisor")
         self.executor = executor
+        self.supervisor_agent = create_supervisor_agent(self.executor.llm)
 
     def execute(self, state: AgentState) -> dict:
-        supervisor_agent = create_supervisor_agent(self.executor.llm)
-
         previous_report = state.get("subagents_report")
 
         main_goal = state.get("main_goal", state.get('msg'))
@@ -202,7 +190,7 @@ class SupervisorNode(Node):
         if previous_report:
             input_message += f"Report from the previous step:\n{previous_report}"
 
-        response = supervisor_agent.invoke({"messages": [HumanMessage(content=input_message)]})
+        response = self.supervisor_agent.invoke({"messages": [HumanMessage(content=input_message)]})
 
         logs = state.get("logs", [])
         raw_output = str(response.get("messages", [])[-1].content)
@@ -221,18 +209,25 @@ class SupervisorNode(Node):
         next_step = plan.get("next", "END")
         msg_out = plan.get("msg", state.get("msg"))
         output = plan.get("output", "")
-        is_before_dp = plan.get("is_before_dp").lower() == "true"
+        is_before_dp = plan.get("is_before_dp")
         logs.append(f"\n[Supervisor Node] Decision made: {output}")
         
-        return {
-            "next": next_step, 
-            "msg": msg_out, 
-            "logs": logs, 
+        return_state = {
+            "next": next_step,
+            "msg": msg_out,
+            "logs": logs,
             "subagents_report": None,
-            "main_goal": main_goal, 
-            "is_before_dp": is_before_dp
+            "is_before_dp": is_before_dp,
+            "main_goal": main_goal
         }
 
+        if next_step == "automl":
+            test_size = plan.get("test_size")
+            target = plan.get("target")
+            return_state = {**return_state, "test_size": test_size, "target": target}
+
+        return return_state
+    
 class RetrieverNode(Node):
     def __init__(self):
         super().__init__("retriever")
@@ -256,11 +251,11 @@ class PlotterNode(Node):
     def __init__(self, executor):
         super().__init__("plot")
         self.executor = executor
+        self.agent = create_plotter_agent(self.executor.df, self.executor.images_path, self.executor.llm)
 
     def execute(self, state: AgentState) -> dict:
         msg = state.get("msg", "").lower()
         logs = state.get("logs", [])
-        is_before_dp = state.get('is_before_dp')
 
         input_message = (
             f"Create plots to help analyze the dataset based on the following instruction: '{msg}'.\n"
@@ -270,8 +265,7 @@ class PlotterNode(Node):
         report = f"\n[Plotter Node] "
 
         try:
-            agent = create_plotter_agent(self.executor.df, self.executor.images_path, self.executor.llm, is_before_dp=is_before_dp)
-            response = agent.invoke({"input": input_message})
+            response = self.agent.invoke({"input": input_message})
             report += response.get("output", "") or str(response)
         except Exception as e:
             report += f"Time series agent failed to execute instruction. Error: {e}"
@@ -279,13 +273,11 @@ class PlotterNode(Node):
         logs.append(report)
         return {"subagents_report": report, "logs": logs}
 
-
-
 class FeedbackNode(Node):
     def __init__(self, executor):
         super().__init__("feedback")
         self.executor = executor
-        self.agent = create_feedback_agent(self.executor.llm)
+        self.agent = create_feedback_agent(executor.llm)
         self.rag = RAG()
 
     def execute(self, state: AgentState) -> dict:
@@ -327,5 +319,111 @@ class FeedbackNode(Node):
             report += f"Error during execution: {e}"
             logs.append(report)
             return {"logs": logs, "feedback": None, "summary": summary, "subagents_report": report}
+    
+class AutoMLNode(Node):
+    def __init__(self, executor):
+        super().__init__("automl")
+        self.executor = executor
+        self.automl_agent = None
 
+    def execute(self, state: AgentState) -> dict:
+        logs = state.get("logs", [])
+        msg = state.get("msg", "")
 
+        # Robust Extraction for test_size
+        test_size_raw = state.get("test_size")
+        try:
+            test_size = float(test_size_raw)
+        except (TypeError, ValueError):
+            error_message = f"Invalid or missing test_size: {test_size_raw!r}. It must be a float between 0 and 1."
+            logs.append(f"[AutoML Node] {error_message}")
+            return {"subagents_report": error_message, "logs": logs}
+
+        # Robust Extraction for target
+        target = state.get("target")
+        if not isinstance(target, str) or not target or target not in self.executor.df.columns:
+            error_message = f"Invalid or missing target column: {target!r}. It must be a non-empty string present in the dataset columns."
+            logs.append(f"[AutoML Node] {error_message}")
+            return {"subagents_report": error_message, "logs": logs}
+
+        # Range validation (already robust)
+        if not (0 < test_size < 1):
+            error_message = "Invalid test_size. Must be a float between 0 and 1."
+            logs.append(f"[AutoML Node] {error_message}")
+            return {"subagents_report": error_message, "logs": logs}
+
+        if self.automl_agent is None:
+            automl_agent = create_automl_agent(self.executor.df, self.executor.llm, target, test_size)
+
+        try:
+            # Invoke the AutoML agent
+            input_message = (
+                f"Based on the following instruction: '{msg}', select the best time series forecasting model and its hyperparameters using automl tools.\n"
+            )
+
+            response = automl_agent.invoke({"input": input_message})
+
+            # Parse the response
+            raw_output = response.get("output", "") or str(response)
+            json_match = re.search(r"\{.*\}", raw_output, re.DOTALL)
+
+            if not json_match:
+                report = f"Error: AutoML agent failed to produce valid JSON. Output: {raw_output}"
+                logs.append(report)
+                return {"subagents_report": report, "logs": logs}
+
+            decision = json.loads(json_match.group(0))
+
+            # Build a concise report of the most important keys, but preserve all prediction data
+            model = decision.get("best_model") or decision.get("model")
+            real = decision.get("real")
+            forecast = decision.get("forecast")
+            logs_agent = decision.get("logs") or []
+
+            report_lines = []
+            if model:
+                report_lines.append(f"Best Model: {model}")
+            if real is not None and forecast is not None:
+                report_lines.append(f"Forecast on {len(forecast)} points completed.")
+            if logs_agent:
+                report_lines.append(f"Logs: {logs_agent[-2:]}")  # Show last two log lines
+            report = " | ".join(report_lines) if report_lines else str(decision)
+
+            logs.append(report)
+            # Return the full original result dict for downstream usage
+            return {"subagents_report": report, "automl_result": decision, "logs": logs}
+
+        except Exception as e:
+            report = f"[AutoML Node] Error during execution: {e}"
+            logs.append(report)
+            return {"subagents_report": report, "logs": logs}
+
+class SummarizerNode(Node):
+    def __init__(self, executor):
+        super().__init__("summarizer")
+        self.executor = executor
+        self.summarizer_agent = create_summarizer_agent(self.executor.llm)
+
+    def execute(self, state:AgentState) -> dict:
+        msg = state.get("msg", "")
+        logs = state.get('logs', [])
+        logs_to_summarize = "\n".join(logs)
+        prompt = f"summarize the following logs and the main goal:\n{logs_to_summarize}\n\nMain Goal: {msg}"
+
+        try:
+            output_path = "agentai/preprocessed_dataset.csv"
+            self.executor.df.to_csv(output_path, index=False)
+            logs.append(f"Preprocessed dataset saved to {output_path}")
+        except Exception as e:
+                logs.append(f"Error saving preprocessed dataset: {e}")
+
+        summary_text = ""
+        try:
+            response = self.summarizer_agent.invoke({"messages": [HumanMessage(content=prompt)]})
+            summary_text = str(response.get("messages", [])[-1].content)
+            logs.append("\n[Summarizer Node] Finished summarizing.")
+        except Exception as e:
+            summary_text = f"ERRO: Falha ao invocar o agente de resumo: {e}"
+            logs.append("\n[Summarizer Node] An error occurred whilst summarizing the logs")
+
+        return {"logs": logs, "summary": summary_text}

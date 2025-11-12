@@ -10,19 +10,9 @@ from langchain_experimental.agents import create_pandas_dataframe_agent
 from agentai.tools import (
     inspection_tools,
     make_plot_tools,
-    retrieve_context
+    retrieve_context,
+    make_automl_tools
 )
-
-# load_dotenv()
-
-#os.environ["DEEPINFRA_API_KEY"] = getpass("Enter your key: ")
-# llm = ChatDeepInfra(model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8")
-
-#llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct")
-
-
-# create_supervisor_agent: '{' instead of '{{', because its not fstring, just a normal string
-# create_pandas_agent: if needed, use '{{' instead of '{', as it uses a fstring internally (????????????????????)
 
 def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
     return create_pandas_dataframe_agent(
@@ -44,12 +34,11 @@ def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         """
     )
 
-
 def create_supervisor_agent(llm) -> AgentExecutor:
     """Creates the supervisor agent"""
     return create_react_agent(
         model=llm,
-        tools=[],
+        tools=[retrieve_context],
         prompt=
         """
         You are a SUPERVISOR agent, an expert in planning and coordinating an Exploratory Data Analysis (EDA) workflow.
@@ -61,35 +50,35 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         1.  **inspect**: If the analysis is incomplete, delegate a new, specific task to the pandas agent. The task should be a logical next step towards the main goal. 
         2.  **imputator**: If the previous analysis showed missing values and the next logical step is to impute them. You must delegate this to the imputation specialist.
         3.  **feature_engineer**: ALL requests to create, transform, or engineer features (e.g., moving averages, ratios, lags, rolling windows, new calculated columns) MUST be delegated to the "feature_engineer" node. 
-        4. **retriever**: To solve problems (like code errors, bad results) or for strategic guidance, you must use the retriever to consult past experiences. If it does not provide a helpful context, continue by yourself.
-        5.  **plot**: If the inspection is done and you believe that visualizations will help in understanding the data better, delegate a task to the plotter agent.
-        6.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
+        4. **automl**: If the dataset is ready for modeling and you need to select and tune a machine learning model automatically, delegate this to the AutoML agent.
+        5.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
+        You also have the following tool:
+        **retriever**: To solve problems (like code errors, bad results) or for strategic guidance, you must use the retriever to consult past experiences. If it does not provide a helpful context, continue by yourself.
+        
         ALWAYS return ONLY a valid JSON object with the following fields:
-        - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action.
-        - "next": The next action, which must be either "inspect", "imputator", "feature_engineer", "retriever", "plot" or "END".
+        - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action. If choosing Automl, clearly explain how you selected the `test_size` and `target` (did you extract it from user prompt, or did you infer/choose it from the dataset columns, summary, or a typical default?).
+        - "next": The next action, which must be either "inspect", "imputator", "feature_engineer", "automl" or "END".
         - "msg": A clear and specific instruction for the next agent. Specifically for the 'imputator', this should be a descriptive context of the dataset for it to make a decision.
-        - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. This is important for the plotter agent to know.
+        - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. 
+        - "test_size": (REQUIRED if next is "automl") A float between 0 and 1 indicating the size of the test set (e.g., 0.2, use 0.2 if user doesn't specify and you can't infer from summary). You must either extract it from the user prompt or reason about a suitable default.
+        - "target": (REQUIRED if next is "automl") A string with the name of the target column in the dataset. If not in the user's prompt, use your findings from data inspection (e.g., pick a numeric column matching forecast context or summary's most likely target; default to a column named 'target' or the first time series value column).
 
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
-        IMPORTANT: If the 'Report from the previous step' contains an ERROR or indicates a FAILURE or if you see that it is in a LOOP, you MUST prioritize using the 'retriever' node to find a solution. DO NOT repeat the same failed instruction.
+        IMPORTANT: If you choose 'automl', ensure that the dataset is clean and well-understood. You must have already delegated tasks to inspect, impute, as needed before reaching this step.
 
+        Example 1 (User Specifies Parameters):
+        User prompt: "Forecast temperature for the next 48 hours using 20% test split."
+        {{"output": "User explicitly specified 'temperature' as target and test size as 0.2. Proceeding to AutoML.", "next": "automl", "msg": "", "is_before_dp": false, "test_size": 0.2, "target": "temperature"}}
 
-        Example 1 (Starting):
-        {"output": "The analysis has just started. I will begin by getting an overview of the dataset.", "next": "inspect", "msg": "Summarize the dataset, checking for missing values and data types.", "is_before_dp": "True"}
+        Example 2 (Agent Deduces Parameters):
+        User prompt: "Run a forecast for this dataset."
+        Dataset columns: ["date", "pressure", "temperature", "humidity"]
+        {{"output": "User didn't specify test split or target; defaulting to test_size=0.2 and choosing 'temperature' because it is a numerical feature and often forecasted in sensor timeseries.", "next": "automl", "msg": "", "is_before_dp": false, "test_size": 0.2, "target": "temperature"}}
 
-        Example 2 (Delegating Imputation):
-        {"output": "The inspection revealed missing data in several columns. I will now delegate the task of choosing the best imputation method to the specialist.", "next": "imputator", "msg": "The initial analysis found missing values in the following columns: ['temperature', 'pressure']. The data appears to be time-series sensor data.", "is_before_dp": "True"}
-        
-        Example 3 (Delegating Feature Engineering):
-        {"output": "The dataset is noisy, some feature extraction is essential", "next": "feature_engineer", "msg": "There is a noisy time series dataset, where the timestamp indicates  year, month, day and hour.", "is_before_dp": "False"}
-
-        Example 4 (Using the Retriever Correctly):
-        {"output": "The feature_engineer node failed. I will search the knowledge base for a solution.", "next": "retriever", "msg": "error in feature_engineer node: the node got stuck in a loop", is_before_dp": "False"}
-
-        Example 6 (Ending):
-        {"output": "The data has been inspected and imputed. The goal is met. The workflow will now end.", "next": "END", "msg": "Workflow complete.", is_before_dp": "False"}
-        """,
+        Example 3 (Ending):
+        {{"output": "The data has been inspected, imputed, visualized, and modeled. The analysis is complete.", "next": "END", "msg": "Workflow complete.", "is_before_dp": "False"}}
+        """
     )
 
 def create_imputator_agent(llm) -> AgentExecutor:
@@ -132,7 +121,6 @@ def create_imputator_agent(llm) -> AgentExecutor:
         """,
 
     )
-
 
 def create_summarizer_agent(llm) -> AgentExecutor:
     """Creates the summarizer agent"""
@@ -201,31 +189,46 @@ def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: 
         """    
     )
 
-
 def create_feedback_agent(llm) -> AgentExecutor:
     """Cria o agente de retroalimentação (aprendizados passados)"""
     return create_react_agent(
         model=llm,
         prompt="""
-        You are a FeedbackAgent. Your role is to analyze logs and summaries from a workflow execution and decide if there is valuable **knowledge to store for future use**.
+        You are a FeedbackAgent. Your role is to analyze logs and summaries to identify valuable knowledge, check if it's redundant, and decide if it should be stored.
 
-        Rules:
-        - Identify practical lessons, solutions to errors, or strategies that improved results.
-          Examples:
-            * "AutoML training was poor but improved after adding feature X."
-            * "Python error Y can be avoided by doing Z."
-            * "For dataset type X, imputation technique Z performed poorly."
-        - Ignore trivial steps, repeated errors without resolution, or transient issues.
-        - Output ONLY a valid JSON object:
-          {
-            "store": true/false,
-            "insight": "short, clear statement of the learned knowledge (if store=true)"
-          }
+        You have one tool:
+        - **retrieve_context**: Use this to check if a potential insight already exists in the knowledge base.
 
-        If nothing valuable was learned, return:
+        **Workflow:**
+        1.  Analyze the logs and identify a concise, practical insight (e.g., "AutoML error X was fixed by doing Y").
+        2.  If no insight is found, stop and output `{"store": false, "insight": ""}`.
+        3.  If an insight is found, YOU MUST use the `retrieve_context` tool with the insight as the query.
+        4.  Analyze the tool's output:
+            - If the retrieved context is *not* helpful or *very different* from your insight, the insight is new.
+            - If the retrieved context is *very similar* or *identical*, the insight is redundant.
+        5.  Based on your analysis, output ONLY a valid JSON object with your final decision:
+            {
+              "store": true/false,
+              "insight": "short, clear statement of the learned knowledge (if store=true)"
+            }
+
+        **Example Thought Process:**
+        1.  Logs show 'Error: M' was fixed by 'Solution: S'.
+        2.  My potential insight is: "Error M is fixed by Solution S".
+        3.  Action: `retrieve_context(query="Error M is fixed by Solution S")`
+        4.  Observation: "RAG retrieve failed..." or "No relevant solution..." -> My insight is new.
+        5.  Final Decision: `{"store": true, "insight": "Error M is fixed by Solution S"}`
+
+        **Example 2 (Redundant):**
+        1.  Insight: "Error M is fixed by Solution S".
+        2.  Action: `retrieve_context(query="Error M is fixed by Solution S")`
+        3.  Observation: "...[doc]... Error M is resolved by Solution S..." -> My insight is a duplicate.
+        4.  Final Decision: `{"store": false, "insight": ""}`
+
+        If nothing valuable was learned from the start, return:
           {"store": false, "insight": ""}
         """,
-        tools=[]
+        tools=[retrieve_context]
     )
     
 def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
@@ -276,3 +279,52 @@ def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
             * Use `retrieve_context` rag tool for errors or general advices on techniques and parameters.
         """
     )
+
+def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float) -> AgentExecutor:
+    """
+    Cria o agente AutoML
+    """
+    automl_tools = make_automl_tools(df, target, test_size)
+
+    return create_pandas_dataframe_agent(
+        llm=llm,
+        df=df,
+        verbose=True,
+        allow_dangerous_code=True,
+        extra_tools=automl_tools,
+        prefix="""
+        You are an AutoML Agent specialized in time series forecasting. You have access to the autogluon_forecast tool.
+
+        **CRITICAL INSTRUCTIONS:**
+        1. Call the autogluon_forecast tool to perform forecasting.
+        2. After receiving the forecast results, IMMEDIATELY call visualize_autogluon_forecast with the "real" and "forecast" arrays from the tool output.
+        3. Your FINAL ANSWER must be a valid JSON object (no markdown, no code blocks, no text before or after).
+
+        **OUTPUT FORMAT:**
+        Your final answer must be ONLY a JSON object with these fields:
+        {{
+            "real": [array of real values from autogluon_forecast output],
+            "forecast": [array of forecast values from autogluon_forecast output],
+            "best_model": "model name from autogluon_forecast output",
+            "logs": [array of log strings from autogluon_forecast output],
+            "plot_path": "path from visualize_autogluon_forecast output"
+        }}
+
+        **IMPORTANT:**
+        - If any tool fails, return a JSON with an "error" field: {{"error": "description of what went wrong"}}
+        - NEVER output empty strings or non-JSON text
+        - NEVER use markdown code fences (```json or ```)
+        - ALWAYS output valid JSON that can be parsed
+        - Extract arrays directly from tool outputs - do not modify them
+
+        **Example workflow:**
+        1. Action: autogluon_forecast
+        2. Observation: {{"real": [1,2,3], "forecast": [1.1,2.1,3.1], "best_model": "ETS", "logs": [...]}}
+        3. Action: visualize_autogluon_forecast
+           Action Input: {{"real": [1,2,3], "forecast": [1.1,2.1,3.1], "output_path": "AutogluonModels/prediction_plot.png"}}
+        4. Observation: {{"plot_path": "AutogluonModels/prediction_plot.png", "log": [...]}}
+        5. Final Answer: {{"real": [1,2,3], "forecast": [1.1,2.1,3.1], "best_model": "ETS", "logs": [...], "plot_path": "AutogluonModels/prediction_plot.png"}}
+
+        Now start by calling autogluon_forecast.
+        """
+  )

@@ -1,0 +1,78 @@
+
+RAG KNOWLEDGE BASE — Data Preprocessing for Time Series and Generic Signals
+
+This document is specifically designed for Retrieval-Augmented Generation (RAG). It provides dense, context-rich, self-contained information for agents performing data preprocessing, interpolation, feature extraction, and signal representation in time series and multivariate data.
+
+1. Concept and Context
+Data preprocessing in time series and generic signals involves two main stages: interpolation (gap filling, temporal reconstruction, missing data imputation) and feature extraction (signal representation, dimensionality reduction, feature engineering). The goal is to transform raw signals into informative structures ready for classification, forecasting, or diagnostic modeling. Each method choice must depend on the signal’s characteristics: noise, periodicity, nonlinearity, sampling rate, and correlation structure.
+
+2. Interpolation Methods
+
+2.1 Smooth and Stationary Signals
+For continuous and low-noise signals, use Linear Interpolation, Polynomial Interpolation, or Cubic Spline. These methods preserve continuity and are computationally simple. Suitable for physical measurements such as temperature, voltage, pressure, or flow. Keywords: linear interpolation, spline, polynomial regression, smooth data, continuous reconstruction.
+
+2.2 Periodic or Quasi-Periodic Signals
+For periodic or oscillatory data, use Fourier Transform, Spectral PCA, Wavelet Transform (CWT, DWT, STFT). Fourier-based interpolation works best for harmonic and stationary patterns; wavelet-based reconstruction adapts to nonstationary or discontinuous signals. Keywords: harmonic signal, frequency domain, spectral interpolation, time-frequency analysis.
+
+2.3 Long Gaps or Noisy Series
+For irregular data with stochastic noise or long missing blocks, use ARIMA, SARIMA, Kalman Filter, State-Space Models, or Gaussian Process Regression (GPR). These stochastic methods capture uncertainty and temporal correlation. GPR is particularly effective when the signal exhibits nonlinear temporal dependencies and uncertainty estimation is required. Keywords: ARIMA, Kalman filter, stochastic interpolation, uncertainty propagation, Gaussian process regression, probabilistic model.
+
+2.4 Nonlinear or Chaotic Signals
+For nonlinear, complex, or chaotic dynamics, use Artificial Neural Networks (ANN), LSTM, SVM Regression, or GPR. These learning-based models approximate nonlinear mappings between time points. Suitable for EEG, EKG, industrial sensors, or financial data. Keywords: nonlinear dynamics, deep learning interpolation, machine learning gap filling.
+
+2.5 Multivariate or Correlated Series
+When signals are correlated or come from multiple sensors, use Multivariate Regression with AR residuals (ARMAX), Multivariate Kriging, or Multiple Imputation by Chained Equations (MICE). MICE performs iterative regression between features to impute missing values while maintaining covariance consistency. These methods preserve spatial or inter-variable dependencies. Keywords: multivariate interpolation, ARMAX, kriging, multiple imputation, chained equations, correlated features.
+
+2.6 Local Irregular or Non-Gaussian Data
+For signals with local irregularities or non-Gaussian noise, use k-Nearest Neighbors (KNN) Interpolation or Kernel Regression. Both are data-driven and robust to local variation. KNN interpolation estimates missing points from nearby samples using distance-weighted averaging. Keywords: local interpolation, adaptive neighborhood, KNN imputation, kernel smoothing.
+
+2.7 Missing Blocks and Structured Gaps
+For large missing segments, use Singular Spectrum Analysis (SSA) or state-space reconstruction. These methods decompose the time series into trend, oscillatory, and noise components and reconstruct the gap from principal components. Keywords: missing data reconstruction, SSA, embedding, spectral decomposition.
+
+3. Interpolation Evaluation
+Use quantitative criteria to assess accuracy and stability: RMSE, MAE, Nash–Sutcliffe Efficiency (NSE), Normalized Root Mean Square Deviation (NRMSD), and 95% Confidence Coverage. For uncertainty estimation, apply Monte Carlo Simulation or error propagation techniques. Keywords: performance metrics, model validation, uncertainty estimation, interpolation quality.
+
+4. Feature Extraction
+
+4.1 Geometric Features
+Geometric features describe waveform morphology: amplitude, slope, area under curve, peaks, angles, and durations. These features represent shape and transitions, useful in classification and diagnostic models. Keywords: waveform shape, geometric features, morphology, time-domain descriptors.
+
+4.2 Statistical Features
+Statistical descriptors summarize data distribution: mean, variance, standard deviation, entropy, kurtosis, skewness. Suitable for noisy, random, or stochastic signals. Entropy detects irregularity; kurtosis and skewness detect peaks and asymmetry. Keywords: statistical features, signal statistics, entropy, variance, kurtosis, skewness.
+
+4.3 Texture Features
+Texture features model repeating temporal or spatial patterns. Common metrics include GLCM-based Entropy, Contrast, Correlation, Energy, and Homogeneity, or Tamura’s Coarseness, Directionality, and Regularity. These are useful for periodic or structured signals. Keywords: texture analysis, temporal regularity, GLCM, Tamura features, pattern detection.
+
+4.4 Color or Channel-Based Features
+For multichannel data (e.g., RGB, spectral sensors, multisensor systems), use Color Moments, Histograms, Mean RGB, or Channel Statistics. These capture variability across channels or frequencies. Keywords: multichannel signals, spectral features, color histogram, cross-channel features.
+
+5. Mapping Between Dataset Type and Optimal Method
+
+| Dataset Type | Data Characteristics | Recommended Interpolation | Recommended Features |
+|---------------|----------------------|----------------------------|----------------------|
+| Continuous physical signal | Smooth, stationary | Linear / Spline | Statistical + RMS |
+| Industrial sensor | Noisy, irregular | Kalman / ARIMA / MICE | Entropy + Variance |
+| Biological signal (EEG/ECG) | Oscillatory, nonstationary | Wavelet / SSA | Geometric + Entropy |
+| Financial series | Chaotic, nonlinear | LSTM / GPR | Kurtosis + Moments |
+| Environmental data | Seasonal, missing | SARIMA / Kriging | Mean + Trend |
+| Multisensor data | Correlated variables | ARMAX / MICE / Multivariate Kriging | PCA + Cross-correlation |
+| High-frequency signal | Spiky, noisy | Fourier / Wavelet | Spectral Energy + Entropy |
+
+6. Decision Guidelines for RAG Agents
+
+- If the signal is smooth and continuous → use Linear or Spline.
+- If periodic or oscillatory → use Fourier or Wavelet.
+- If nonstationary → use ARIMA, Kalman, or SSA.
+- If nonlinear or chaotic → use ANN, SVM, or GPR.
+- If multivariate or correlated → use MICE, Kriging, or ARMAX.
+- If noise is high → apply Monte Carlo uncertainty propagation.
+- For classification → extract Statistical and Geometric features.
+- For pattern detection → extract Texture or Spectral features.
+
+7. Relation Between Interpolation and Feature Extraction
+Interpolation choice directly impacts feature integrity. Fourier and Wavelet preserve frequency-domain information; Spline and KNN preserve waveform shape; ARIMA and Kalman maintain statistical properties; MICE and GPR maintain distributional coherence. After interpolation, always re-evaluate the feature space for correlation and variance preservation. Keywords: feature stability, preprocessing dependency, reconstruction accuracy, signal coherence.
+
+8. Summary
+Deterministic interpolators are fast and ideal for clean, smooth signals. Stochastic interpolators handle noise and uncertainty. Spectral methods are ideal for periodicity. Machine learning approaches such as GPR, ANN, and LSTM suit nonlinear or complex patterns. Multiple imputation methods like MICE preserve multivariate structure. KNN provides local adaptation. Feature extraction should match the signal behavior and the chosen interpolation to maintain physical and statistical consistency across the dataset.
+
+End of RAG-optimized knowledge base for time series and signal preprocessing.

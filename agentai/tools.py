@@ -1,5 +1,6 @@
 from langchain_community.tools import WikipediaQueryRun
 from langchain_community.utilities import WikipediaAPIWrapper
+from langchain.tools import Tool
 
 from langchain.tools import tool
 import pandas as pd
@@ -700,12 +701,11 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
 
     # ========== Main Tool ==========
 
-    @tool
-    def autogluon_forecast() -> dict:
+    def autogluon_forecast(input_text: str) -> dict:
         """
         Perform time series forecasting using AutoGluon TimeSeriesPredictor on the in-memory DataFrame.
         Uses the first time/date-like column as timestamp and a single series item_id.
-        Returns real values, forecast values, best model info and basic logs.
+        Returns real values, forecast values, best model info, evaluation metrics and basic logs.
         """
         logs = []
         new_df = df.copy()
@@ -725,7 +725,7 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
         if not isinstance(test_size, float) or not (0 < test_size < 1):
             return {"error": "Invalid 'test_size'. Must be a float between 0 and 1.", "logs": logs}
 
-        # Lazy import to avoid hard dependency when tool unused
+        # ---------- Lazy import ----------
         try:
             from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor  # type: ignore
         except Exception as e:
@@ -765,27 +765,30 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
             predictor = TimeSeriesPredictor(
                 prediction_length=fh,
                 target=target,
-                eval_metric="MASE",
+                eval_metric="MSE",
                 verbosity=2,
             )
-            predictor.fit(train_data, presets="fast_training", num_val_windows=1, enable_ensemble=True)
-            logs.append("AutoGluon training completed.")
+            predictor.fit(
+                train_data,
+                presets="fast_training",
+                time_limit=None,
+                hyperparameter_tune_kwargs=None
+            )
+            logs.append("AutoGluon training completed using 'fast_training' presets.")
         except Exception as e:
             return {"error": f"AutoGluon training failed: {e}", "logs": logs}
 
         # ---------- Predict ----------
         try:
             preds = predictor.predict(test_data)
-            # Extract arrays for single item_id
             mean_series = preds["mean"]
             real_series = test_data[target]
-            # Align last fh points from test target for comparison
             real_tail = real_series.groupby(level="item_id").tail(fh).values
             forecast_vals = mean_series.groupby(level="item_id").tail(fh).values
         except Exception as e:
             return {"error": f"Prediction failed: {e}", "logs": logs}
 
-        best_model = None
+        # ---------- Best Model ----------
         try:
             best_model = predictor.model_best
         except Exception:
@@ -803,7 +806,7 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
 
         # ---------- Generate Plots ----------
         _plot_main_forecast(train_timestamps, train_values, forecast_timestamps, 
-                           forecast_actuals, forecast_preds, preds, target, output_path, logs)
+                            forecast_actuals, forecast_preds, preds, target, output_path, logs)
         
         _plot_forecast_vs_actual(forecast_timestamps, forecast_actuals, forecast_preds, 
                                 preds, target, output_path, logs)
@@ -812,12 +815,47 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
         
         _plot_error_over_time(forecast_timestamps, forecast_actuals, forecast_preds, output_path, logs)
 
+        # ---------- Compute Metrics ----------
+        try:
+            from sklearn.metrics import mean_absolute_error, mean_squared_error
+            import numpy as np
+
+            mae = mean_absolute_error(forecast_actuals, forecast_preds)
+            rmse = np.sqrt(mean_squared_error(forecast_actuals, forecast_preds))
+            mape = np.mean(np.abs((forecast_actuals - forecast_preds) / forecast_actuals)) * 100
+
+            # Compute MASE via AutoGluon's built-in evaluation
+            eval_results = predictor.evaluate(test_data)
+            mase = eval_results.get("MASE", None) if isinstance(eval_results, dict) else None
+
+            metrics = {
+                "MAE": float(mae),
+                "RMSE": float(rmse),
+                "MAPE": float(mape),
+                "MASE": float(mase) if mase is not None else None
+            }
+
+            logs.append(f"Evaluation metrics computed: {metrics}")
+        except Exception as e:
+            metrics = {"error": f"Metrics computation failed: {e}"}
+            logs.append(f"Metrics computation failed: {e}")
+
+        # ---------- Return ----------
         return {
             "best_model": str(best_model) if best_model is not None else None,
+            "metrics": metrics,
             "logs": logs,
         }
 
-    return [autogluon_forecast]
+
+    return [
+        Tool.from_function(
+            autogluon_forecast,
+            name="autogluon_forecast",
+            description="Run AutoGluon time-series forecasting on the provided DataFrame and return a JSON object with keys like best_model, logs, metrics and file paths."
+        )
+    ]
+
 
 @tool
 def retrieve_context(query: str) -> dict:

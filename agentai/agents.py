@@ -308,7 +308,7 @@ def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float) ->
         {{
             "best_model": "NaiveMean",
             "logs": ["Using 'date' as timestamp column.", "Split data into train (100) and test (25).", ...],
-            "plot_path": "AutogluonModels/prediction_plot.png"
+            "plot_path": "results/AutogluonModels/prediction_plot.png"
         }}
 
         Do NOT include a 'params' field unless it comes directly from the tool's output. Do NOT output markdown or code fencing; return pure JSON only.

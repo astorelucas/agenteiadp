@@ -1,11 +1,11 @@
-# Repository for Project Agent of Future
+# OPA – Observe, Preprocess, and Act
 
 Projeto desenvolvido pelo Projeto Agents-of-Future do FutureLab (DCC-UFMG) em Parceria com a KUNUMI S/A.
 
 # Arquitetura
 
 >  <p align="left">
->  <img src="https://github.com/astorelucas/agenteiadp/blob/main/workflow_mermaid_graph.png?raw=true" alt="Arquitetura" width="500"/>
+>  <img src="https://github.com/astorelucas/agenteiadp/blob/main/agentai/workflow_graph.png?raw=true" alt="Arquitetura" width="500"/>
 >  </p> 
 
 ## Estrutura do Repositório
@@ -14,12 +14,17 @@ Projeto desenvolvido pelo Projeto Agents-of-Future do FutureLab (DCC-UFMG) em Pa
 
 agenteiadp/
 ├── agentai/                # Módulos principais
+|   ├── FAISS_DB/           # Datasets
 |   ├── datasets/           # Datasets
 |   ├── modules/            # Utilitários
 │   ├── __init__.py
-│   ├── agent.py            # Agente inteligente principal
+│   ├── agents.py           # Agente inteligente principal
+│   ├── base_rag.txt        # RAG
+│   ├── nodes.py            # Nós
+│   ├── rag.py              # RAG
 │   ├── tools.py            # Ferramentas dos agentes
 │   └── workflow.py         # Grafo de orquestração
+│   ├── workflow_graph.png  # Arquitetura
 ├── help/                   # Algumas orientações
 ├── notebooks/              # Notebooks testes
 │   └── datasets/           # Datasets utilizados nos notebooks

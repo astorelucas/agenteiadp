@@ -187,302 +187,302 @@ def inspect_data(df: str) -> Dict:
     except Exception as e:
         return {"error": str(e)}
 
-def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> List:
-    """ Create plotting tools with the given DataFrame
-    """
+# def make_plot_tools(df: pd.DataFrame, images_path: str, is_before_dp: bool) -> List:
+#     """ Create plotting tools with the given DataFrame
+#     """
     
-    images_path = images_path
+#     images_path = images_path
     
-    if not os.path.exists(images_path):
-        os.makedirs(images_path, exist_ok=True) 
+#     if not os.path.exists(images_path):
+#         os.makedirs(images_path, exist_ok=True) 
 
-    @tool
-    def plot_time_series(cols_str: str = None):
-        """
-        Plot time series line plot for specified columns with individual subplots.
-        If 'cols_str' is None, plots all numeric columns.
-        Args:
-            cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
-        Returns:
-            dict: Success message or error details
-        """
-        try:
-            # Validar se o DataFrame não está vazio
-            if df.empty:
-                return {"error": "DataFrame is empty"}
+#     @tool
+#     def plot_time_series(cols_str: str = None):
+#         """
+#         Plot time series line plot for specified columns with individual subplots.
+#         If 'cols_str' is None, plots all numeric columns.
+#         Args:
+#             cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
+#         Returns:
+#             dict: Success message or error details
+#         """
+#         try:
+#             # Validar se o DataFrame não está vazio
+#             if df.empty:
+#                 return {"error": "DataFrame is empty"}
 
-            time_col = df.columns[0]
+#             time_col = df.columns[0]
 
-            if time_col not in df.columns:
-                available_cols = list(df.columns)
-                return {"error": f"Time column '{time_col}' not found. Available columns: {available_cols}"}
+#             if time_col not in df.columns:
+#                 available_cols = list(df.columns)
+#                 return {"error": f"Time column '{time_col}' not found. Available columns: {available_cols}"}
 
-            cols = cols_str.split(",") if cols_str else None
+#             cols = cols_str.split(",") if cols_str else None
 
-            # Se cols não foi especificado, usar todas as colunas numéricas
-            if cols is None:
-                numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-                if time_col in numeric_cols:
-                    numeric_cols.remove(time_col)
-                cols = numeric_cols
+#             # Se cols não foi especificado, usar todas as colunas numéricas
+#             if cols is None:
+#                 numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+#                 if time_col in numeric_cols:
+#                     numeric_cols.remove(time_col)
+#                 cols = numeric_cols
 
-            if not cols:
-                return {"error": "No numeric columns found to plot"}
+#             if not cols:
+#                 return {"error": "No numeric columns found to plot"}
 
-            # Validar se todas as colunas especificadas existem
-            missing_cols = [col for col in cols if col not in df.columns]
-            if missing_cols:
-                return {"error": f"Columns not found: {missing_cols}"}
+#             # Validar se todas as colunas especificadas existem
+#             missing_cols = [col for col in cols if col not in df.columns]
+#             if missing_cols:
+#                 return {"error": f"Columns not found: {missing_cols}"}
 
-            # Verificar se há dados não-nulos para plotar
-            valid_data = df[[time_col] + cols].dropna()
-            if valid_data.empty:
-                return {"error": "No valid data to plot (all values are null)"}
+#             # Verificar se há dados não-nulos para plotar
+#             valid_data = df[[time_col] + cols].dropna()
+#             if valid_data.empty:
+#                 return {"error": "No valid data to plot (all values are null)"}
 
-            # Converter a coluna de tempo para datetime
-            try:
-                time_data = pd.to_datetime(valid_data[time_col])
-            except Exception as e:
-                return {"error": f"Error converting time column to datetime: {str(e)}"}
+#             # Converter a coluna de tempo para datetime
+#             try:
+#                 time_data = pd.to_datetime(valid_data[time_col])
+#             except Exception as e:
+#                 return {"error": f"Error converting time column to datetime: {str(e)}"}
 
-            # Filtrar apenas colunas numéricas válidas
-            valid_cols = []
-            for col in cols:
-                if not pd.api.types.is_numeric_dtype(df[col]):
-                    print(f"Warning: Column '{col}' is not numeric, skipping...")
-                    continue
-                valid_cols.append(col)
+#             # Filtrar apenas colunas numéricas válidas
+#             valid_cols = []
+#             for col in cols:
+#                 if not pd.api.types.is_numeric_dtype(df[col]):
+#                     print(f"Warning: Column '{col}' is not numeric, skipping...")
+#                     continue
+#                 valid_cols.append(col)
 
-            if not valid_cols:
-                return {"error": "No valid numeric columns to plot"}
+#             if not valid_cols:
+#                 return {"error": "No valid numeric columns to plot"}
 
-            n_cols = len(valid_cols)
-            n_rows = (n_cols + 1) // 2 if n_cols > 1 else 1  # 2 colunas por linha
-            n_subplot_cols = min(n_cols, 2)
+#             n_cols = len(valid_cols)
+#             n_rows = (n_cols + 1) // 2 if n_cols > 1 else 1  # 2 colunas por linha
+#             n_subplot_cols = min(n_cols, 2)
 
-            # Criar subplots
-            fig, axes = plt.subplots(n_rows, n_subplot_cols, figsize=(15, 4 * n_rows))
+#             # Criar subplots
+#             fig, axes = plt.subplots(n_rows, n_subplot_cols, figsize=(15, 4 * n_rows))
 
-            if n_cols == 1:
-                axes = [axes]
-            elif n_rows == 1:
-                axes = axes if isinstance(axes, np.ndarray) else [axes]
-            else:
-                axes = axes.flatten()
+#             if n_cols == 1:
+#                 axes = [axes]
+#             elif n_rows == 1:
+#                 axes = axes if isinstance(axes, np.ndarray) else [axes]
+#             else:
+#                 axes = axes.flatten()
 
-            # Plotar cada coluna em seu próprio subplot
-            for i, col in enumerate(valid_cols):
-                ax = axes[i]
-                ax.plot(time_data, valid_data[col], label=col, marker='o', markersize=2, color=f'C{i}')
-                ax.set_title(f"Time Series - {col}")
-                ax.set_xlabel("Time")
-                ax.set_ylabel(col)
-                ax.tick_params(axis='x', rotation=45)
-                ax.grid(True, alpha=0.3)
-                ax.legend()
+#             # Plotar cada coluna em seu próprio subplot
+#             for i, col in enumerate(valid_cols):
+#                 ax = axes[i]
+#                 ax.plot(time_data, valid_data[col], label=col, marker='o', markersize=2, color=f'C{i}')
+#                 ax.set_title(f"Time Series - {col}")
+#                 ax.set_xlabel("Time")
+#                 ax.set_ylabel(col)
+#                 ax.tick_params(axis='x', rotation=45)
+#                 ax.grid(True, alpha=0.3)
+#                 ax.legend()
 
-            if n_cols % 2 == 1 and n_cols > 1:
-                axes[-1].set_visible(False)
+#             if n_cols % 2 == 1 and n_cols > 1:
+#                 axes[-1].set_visible(False)
 
-            plt.suptitle("Time Series Analysis by Column", fontsize=16, y=0.98)
-            plt.tight_layout()
-            os.makedirs(images_path, exist_ok=True)
-            plt.savefig(os.path.join(images_path, "time_series_plots.png"), bbox_inches="tight", dpi=300)
+#             plt.suptitle("Time Series Analysis by Column", fontsize=16, y=0.98)
+#             plt.tight_layout()
+#             os.makedirs(images_path, exist_ok=True)
+#             plt.savefig(os.path.join(images_path, "time_series_plots.png"), bbox_inches="tight", dpi=300)
 
-            plt.close()
+#             plt.close()
 
-            return {"msg": f"Time series subplots created successfully for columns: {valid_cols}"}
+#             return {"msg": f"Time series subplots created successfully for columns: {valid_cols}"}
 
-        except Exception as e:
-            return {"error": f"Unexpected error: {str(e)}"}
+#         except Exception as e:
+#             return {"error": f"Unexpected error: {str(e)}"}
 
 
-    @tool
-    def plot_scatter(two_cols_str: str):
-        """
-        Create an enhanced scatter plot between two specified columns.
+#     @tool
+#     def plot_scatter(two_cols_str: str):
+#         """
+#         Create an enhanced scatter plot between two specified columns.
 
-        Args:
-            two_cols_str: Comma-separated string of two column names to plot (str). Example: "col1,col2,col3"
+#         Args:
+#             two_cols_str: Comma-separated string of two column names to plot (str). Example: "col1,col2,col3"
 
-        Returns:
-            dict: Success message or error details
-        """
-        try:
-            # Validar se o DataFrame não está vazio
-            if df.empty:
-                return {"error": "DataFrame is empty"}
+#         Returns:
+#             dict: Success message or error details
+#         """
+#         try:
+#             # Validar se o DataFrame não está vazio
+#             if df.empty:
+#                 return {"error": "DataFrame is empty"}
             
-            cols = two_cols_str.split(",") if two_cols_str else None
+#             cols = two_cols_str.split(",") if two_cols_str else None
 
-            # Se cols não foi especificado, retornar erro
-            if not cols:
-                return {"error": "No columns found to plot"}
+#             # Se cols não foi especificado, retornar erro
+#             if not cols:
+#                 return {"error": "No columns found to plot"}
             
-            # Se cols não contém exatamente 2 colunas, retornar erro
-            if len(cols) != 2:
-                return {"error": "Please provide exactly two columns for scatter plot"}
+#             # Se cols não contém exatamente 2 colunas, retornar erro
+#             if len(cols) != 2:
+#                 return {"error": "Please provide exactly two columns for scatter plot"}
             
-            x, y = cols
+#             x, y = cols
             
-            plt.scatter(df[x], df[y])
-            plt.xlabel(x)
-            plt.ylabel(y)
-            plt.title(f"{x} vs {y}")
-            plt.tight_layout()
-            os.makedirs(images_path, exist_ok=True)
-            filename = f"scatter_{x}_vs_{y}.png"
-            plt.savefig(os.path.join(images_path, filename), bbox_inches="tight", dpi=300)
-            plt.close()
+#             plt.scatter(df[x], df[y])
+#             plt.xlabel(x)
+#             plt.ylabel(y)
+#             plt.title(f"{x} vs {y}")
+#             plt.tight_layout()
+#             os.makedirs(images_path, exist_ok=True)
+#             filename = f"scatter_{x}_vs_{y}.png"
+#             plt.savefig(os.path.join(images_path, filename), bbox_inches="tight", dpi=300)
+#             plt.close()
 
-            return {"msg": f"Scatter plot created successfully for {x} vs {y}"}
+#             return {"msg": f"Scatter plot created successfully for {x} vs {y}"}
 
-        except Exception as e:
-            return {"error": f"Unexpected error: {str(e)}"}
+#         except Exception as e:
+#             return {"error": f"Unexpected error: {str(e)}"}
     
-    @tool
-    def plot_histograms(cols_str: str = None, bins: int = 15):
-        """
-        Create individual histograms for specified columns.
+#     @tool
+#     def plot_histograms(cols_str: str = None, bins: int = 15):
+#         """
+#         Create individual histograms for specified columns.
 
-        Args:
-            cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
-            bins: Number of bins for the histograms (int).
+#         Args:
+#             cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
+#             bins: Number of bins for the histograms (int).
 
-        If 'cols' is None, plot all numeric columns.
-        """
-        try:
+#         If 'cols' is None, plot all numeric columns.
+#         """
+#         try:
 
-            cols = cols_str.split(",") if cols_str else None
-            if cols is None:
-                cols = df.select_dtypes(include="number").columns.tolist()
+#             cols = cols_str.split(",") if cols_str else None
+#             if cols is None:
+#                 cols = df.select_dtypes(include="number").columns.tolist()
 
-            n_cols = 2  # número de colunas no grid de subplots
-            n_rows = (len(cols) + 1) // n_cols
+#             n_cols = 2  # número de colunas no grid de subplots
+#             n_rows = (len(cols) + 1) // n_cols
 
-            plt.figure(figsize=(6 * n_cols, 4 * n_rows))
+#             plt.figure(figsize=(6 * n_cols, 4 * n_rows))
 
-            # Criar subplots
-            for idx, col in enumerate(cols, 1):
-                plt.subplot(n_rows, n_cols, idx)
-                sns.histplot(df[col], bins=bins, kde=True, color="skyblue", edgecolor="black")
+#             # Criar subplots
+#             for idx, col in enumerate(cols, 1):
+#                 plt.subplot(n_rows, n_cols, idx)
+#                 sns.histplot(df[col], bins=bins, kde=True, color="skyblue", edgecolor="black")
 
-                plt.title(f"{col}", fontsize=14)
-                plt.xlabel(col, fontsize=12)
-                plt.ylabel("Frequency", fontsize=12)
-                plt.grid(True, linestyle="--", alpha=0.6)
+#                 plt.title(f"{col}", fontsize=14)
+#                 plt.xlabel(col, fontsize=12)
+#                 plt.ylabel("Frequency", fontsize=12)
+#                 plt.grid(True, linestyle="--", alpha=0.6)
 
-            plt.suptitle("Histograms of numerical variables", fontsize=16, y=1.02)
-            plt.tight_layout()
-            os.makedirs(images_path, exist_ok=True)
-            filename = f"histogram_{col}.png"
-            plt.savefig(os.path.join(images_path, filename), bbox_inches="tight", dpi=300)
+#             plt.suptitle("Histograms of numerical variables", fontsize=16, y=1.02)
+#             plt.tight_layout()
+#             os.makedirs(images_path, exist_ok=True)
+#             filename = f"histogram_{col}.png"
+#             plt.savefig(os.path.join(images_path, filename), bbox_inches="tight", dpi=300)
 
-            plt.close()
+#             plt.close()
 
-            return {"msg": "Histograms created successfully."}
+#             return {"msg": "Histograms created successfully."}
 
-        except Exception as e:
-            return {"error": str(e)}
+#         except Exception as e:
+#             return {"error": str(e)}
 
-    @tool
-    def plot_heatmap():
-        """
-        Create a heatmap of correlations between numeric columns.
-        Args:
-            None
-        Returns:
-            dict: Success message or error details
-        """
-        try:
-            plt.figure(figsize=(8, 6))
-            corr = df.select_dtypes(include="number").corr()
-            sns.heatmap(corr, annot=True, cmap="coolwarm", center=0)
-            plt.title("Correlation Heatmap")
-            plt.tight_layout()
-            os.makedirs(images_path, exist_ok=True)
-            plt.savefig(os.path.join(images_path, "heatmap.png"), bbox_inches="tight", dpi=300)
+#     @tool
+#     def plot_heatmap():
+#         """
+#         Create a heatmap of correlations between numeric columns.
+#         Args:
+#             None
+#         Returns:
+#             dict: Success message or error details
+#         """
+#         try:
+#             plt.figure(figsize=(8, 6))
+#             corr = df.select_dtypes(include="number").corr()
+#             sns.heatmap(corr, annot=True, cmap="coolwarm", center=0)
+#             plt.title("Correlation Heatmap")
+#             plt.tight_layout()
+#             os.makedirs(images_path, exist_ok=True)
+#             plt.savefig(os.path.join(images_path, "heatmap.png"), bbox_inches="tight", dpi=300)
 
-            plt.close()
+#             plt.close()
 
-            return {"msg": "Heatmap created successfully."}
+#             return {"msg": "Heatmap created successfully."}
 
-        except Exception as e:  
-            return {"error": str(e)}
+#         except Exception as e:  
+#             return {"error": str(e)}
         
-    @tool
-    def plot_boxplot(cols_str: str = None):
-        """
-        Create boxplots for specified columns.
+#     @tool
+#     def plot_boxplot(cols_str: str = None):
+#         """
+#         Create boxplots for specified columns.
 
-        Args:
-            cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
+#         Args:
+#             cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
 
-        If 'cols' is None, plot all numeric columns.
-        """
-        try:
+#         If 'cols' is None, plot all numeric columns.
+#         """
+#         try:
 
-            cols = cols_str.split(",") if cols_str else None
-            if cols is None:
-                cols = df.select_dtypes(include="number").columns.tolist()
+#             cols = cols_str.split(",") if cols_str else None
+#             if cols is None:
+#                 cols = df.select_dtypes(include="number").columns.tolist()
 
-            n_cols = 2  # número de colunas no grid de subplots
-            n_rows = (len(cols) + 1) // n_cols
+#             n_cols = 2  # número de colunas no grid de subplots
+#             n_rows = (len(cols) + 1) // n_cols
 
-            plt.figure(figsize=(6 * n_cols, 4 * n_rows))
+#             plt.figure(figsize=(6 * n_cols, 4 * n_rows))
 
-            # Criar subplots
-            for idx, col in enumerate(cols, 1):
-                plt.subplot(n_rows, n_cols, idx)
-                sns.boxplot(y=df[col], color="lightgreen")
+#             # Criar subplots
+#             for idx, col in enumerate(cols, 1):
+#                 plt.subplot(n_rows, n_cols, idx)
+#                 sns.boxplot(y=df[col], color="lightgreen")
 
-                plt.title(f"{col}", fontsize=14)
-                plt.ylabel(col, fontsize=12)
-                plt.grid(True, linestyle="--", alpha=0.6)
+#                 plt.title(f"{col}", fontsize=14)
+#                 plt.ylabel(col, fontsize=12)
+#                 plt.grid(True, linestyle="--", alpha=0.6)
 
-            plt.suptitle("Boxplots of numerical variables", fontsize=16, y=1.02)
-            plt.tight_layout()
-            plt.savefig(f"{images_path}/boxplots.png")
-            plt.close()
+#             plt.suptitle("Boxplots of numerical variables", fontsize=16, y=1.02)
+#             plt.tight_layout()
+#             plt.savefig(f"{images_path}/boxplots.png")
+#             plt.close()
 
-            return {"msg": "Boxplots created successfully."}
+#             return {"msg": "Boxplots created successfully."}
 
-        except Exception as e:
-            return {"error": str(e)}
+#         except Exception as e:
+#             return {"error": str(e)}
         
-    @tool
-    def plot_scatter_matrix(cols_str: str = None):
-        """
-        Create a scatter matrix (pair plot) for specified columns.
+#     @tool
+#     def plot_scatter_matrix(cols_str: str = None):
+#         """
+#         Create a scatter matrix (pair plot) for specified columns.
 
-        Args:
-            cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
+#         Args:
+#             cols_str: List of column names to plot (str). If None, plots all numeric columns. Example: "col1,col2,col3"
 
-        If 'cols' is None, plot all numeric columns.
-        """
-        try:
+#         If 'cols' is None, plot all numeric columns.
+#         """
+#         try:
 
-            cols = cols_str.split(",") if cols_str else None
-            if cols is None:
-                cols = df.select_dtypes(include="number").columns.tolist()
+#             cols = cols_str.split(",") if cols_str else None
+#             if cols is None:
+#                 cols = df.select_dtypes(include="number").columns.tolist()
 
-            if len(cols) < 2:
-                return {"error": "At least two numeric columns are required for scatter matrix."}
+#             if len(cols) < 2:
+#                 return {"error": "At least two numeric columns are required for scatter matrix."}
 
-            sns.pairplot(df[cols], diag_kind="kde", plot_kws={"alpha": 0.5})
-            plt.suptitle("Scatter Matrix (Pair Plot)", fontsize=16, y=1.02)
-            plt.tight_layout()
-            plt.savefig(f"{images_path}/scatter_matrix.png")
-            plt.close()
+#             sns.pairplot(df[cols], diag_kind="kde", plot_kws={"alpha": 0.5})
+#             plt.suptitle("Scatter Matrix (Pair Plot)", fontsize=16, y=1.02)
+#             plt.tight_layout()
+#             plt.savefig(f"{images_path}/scatter_matrix.png")
+#             plt.close()
 
-            return {"msg": "Scatter matrix created successfully."}
+#             return {"msg": "Scatter matrix created successfully."}
 
-        except Exception as e:
-            return {"error": str(e)}
+#         except Exception as e:
+#             return {"error": str(e)}
         
-    return [plot_time_series, plot_scatter, plot_histograms, plot_heatmap, plot_boxplot, plot_scatter_matrix]
+#     return [plot_time_series, plot_scatter, plot_histograms, plot_heatmap, plot_boxplot, plot_scatter_matrix]
 
-def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> List:
+def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2, prediction_length: int = 1, eval_metric: str = "MASE") -> List:
     """ Create AutoML tools with the given DataFrame
     """
 
@@ -565,36 +565,52 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
             logs.append(f"Main forecast plot failed: {e}")
             return False
 
-    def _plot_forecast_vs_actual(forecast_timestamps, forecast_actuals, forecast_preds, 
-                                 preds, target, output_path, logs):
-        """Create isolated forecast period comparison plot."""
+    def _plot_forecast_vs_actual(
+        forecast_timestamps, forecast_actuals, forecast_preds, 
+        preds, target, output_path, logs
+    ):
+        """Create isolated forecast period comparison plot (only one figure)."""
         try:
-            fig_forecast, ax_forecast = plt.subplots(figsize=(12, 6))
-            
+            # Clear any previous figures
+            plt.close('all')
+
+            fig, ax = plt.subplots(figsize=(12, 6))
+
             forecast_timestamps_list = forecast_timestamps.to_list()
-            
-            ax_forecast.plot(forecast_timestamps_list, forecast_actuals, 
-                           color='green', linewidth=2, marker='o', markersize=5,
-                           label="Actual values")
-            ax_forecast.plot(forecast_timestamps_list, forecast_preds, 
-                           color='red', linewidth=2, marker='x', markersize=5,
-                           label="Forecast", linestyle='--')
-            
-            ax_forecast.set_xlabel("Time", fontsize=12)
-            ax_forecast.set_ylabel(target, fontsize=12)
-            ax_forecast.set_title("Forecast Period: Predicted vs Actual", fontsize=14)
-            ax_forecast.legend(loc='best', fontsize=10)
-            ax_forecast.grid(True, alpha=0.3)
-            ax_forecast.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d %H:%M'))
+
+            ax.plot(
+                forecast_timestamps_list,
+                forecast_actuals,
+                color='green', linewidth=2, marker='o', markersize=5,
+                label="Actual values"
+            )
+
+            ax.plot(
+                forecast_timestamps_list,
+                forecast_preds,
+                color='red', linewidth=2, marker='x', markersize=5,
+                label="Forecast", linestyle='--'
+            )
+
+            ax.set_xlabel("Time", fontsize=12)
+            ax.set_ylabel(target, fontsize=12)
+            ax.set_title("Forecast Period: Predicted vs Actual", fontsize=14)
+            ax.legend(loc='best', fontsize=10)
+            ax.grid(True, alpha=0.3)
+
+            ax.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d %H:%M'))
             plt.xticks(rotation=45, ha='right')
-            
+
             plt.tight_layout()
+
             forecast_plot_path = os.path.join(output_path, "forecast_vs_actual.png")
-            plt.savefig(forecast_plot_path, dpi=300, bbox_inches='tight')
-            plt.close()
-            
+            fig.savefig(forecast_plot_path, dpi=300, bbox_inches='tight')
+
+            plt.close(fig)
+
             logs.append(f"Saved forecast vs actual plot to {forecast_plot_path}")
             return True
+        
         except Exception as e:
             logs.append(f"Forecast vs actual plot failed: {e}")
             return False
@@ -709,11 +725,6 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
         """
         logs = []
         new_df = df.copy()
-        
-        # ---------- Output path definition ----------
-        output_path = "agentai/results/forecast/test/" 
-        os.makedirs(output_path, exist_ok=True)
-        logs.append(f"Output path set to: {output_path}")
 
         # ---------- Validation ----------
         if not isinstance(new_df, pd.DataFrame):
@@ -740,41 +751,84 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
 
         # ---------- Prepare TimeSeriesDataFrame ----------
         try:
+            # --- Prepare DataFrame ---
             new_df[time_col] = pd.to_datetime(new_df[time_col])
             new_df = new_df.sort_values(time_col)
+
+            # AutoGluon requires item_id even for 1 series
             new_df["item_id"] = "series_0"
 
-            tsdf = TimeSeriesDataFrame.from_data_frame(
-                new_df[["item_id", time_col, target]].copy(),
+            # Keep ALL columns (target + covariates)
+            all_cols = ["item_id", time_col] + [c for c in new_df.columns if c not in ["item_id", time_col]]
+
+            # NEW: DO NOT convert to TimeSeriesDataFrame before splitting
+            # Because AG splits must receive the *same set of feature columns*
+
+            # --- Train-test split ---
+            train_fraction = 1 - test_size
+            n = len(new_df)
+
+            min_length_allowed = prediction_length + 1
+            if n < min_length_allowed:
+                raise ValueError(f"Series too short: length {n}, needs at least {min_length_allowed}")
+
+            split_idx = int(n * train_fraction)
+            if split_idx <= prediction_length:
+                split_idx = prediction_length + 1
+
+            train_df = new_df.iloc[:split_idx].copy()
+            test_df  = new_df.iloc[split_idx:].copy()
+            
+            # --- Convert to AutoGluon TimeSeriesDataFrame ---
+            train_data = TimeSeriesDataFrame.from_data_frame(
+                train_df[all_cols],
                 id_column="item_id",
-                timestamp_column=time_col,
+                timestamp_column=time_col
+            )  
+
+            test_data = TimeSeriesDataFrame.from_data_frame(
+                test_df[all_cols],
+                id_column="item_id",
+                timestamp_column=time_col
             )
+
         except Exception as e:
             return {"error": f"Failed to build TimeSeriesDataFrame: {e}", "logs": logs}
 
+
         # ---------- Split ----------
+        # try:
+        #     train_data, test_data = tsdf.train_test_split(train_fraction=1 - test_size)
+        #     logs.append(f"Split data into train ({len(train_data)}) and test ({len(test_data)}). Prediction length={fh}")
+        # except Exception as e:
+        #     return {"error": f"Failed to split data: {e}", "logs": logs}
+        
+        # ---------- Frequency inference ----------
         try:
-            fh = max(1, int(len(tsdf) * test_size))
-            train_data, test_data = tsdf.train_test_split(prediction_length=fh)
-            logs.append(f"Split data into train ({len(train_data)}) and test ({len(test_data)}). Prediction length={fh}")
+            freq = pd.infer_freq(train_data.index.get_level_values('timestamp'))
+            if freq is None:
+                freq = 'H'  # default to hourly if inference fails
+            logs.append(f"Inferred data frequency: {freq}")
         except Exception as e:
-            return {"error": f"Failed to split data: {e}", "logs": logs}
+            return {"error": f"Frequency inference failed: {e}", "logs": logs}
 
         # ---------- Train ----------
         try:
             predictor = TimeSeriesPredictor(
-                prediction_length=fh,
+                prediction_length=prediction_length,
                 target=target,
-                eval_metric="MSE",
+                eval_metric=eval_metric,
                 verbosity=2,
+                freq=freq
             )
             predictor.fit(
-                train_data,
-                presets="fast_training",
+                train_data=train_data,
+                tuning_data=test_data,
+                presets="high_quality",
                 time_limit=None,
                 hyperparameter_tune_kwargs=None
             )
-            logs.append("AutoGluon training completed using 'fast_training' presets.")
+            logs.append("AutoGluon training completed using 'high_quality' presets.")
         except Exception as e:
             return {"error": f"AutoGluon training failed: {e}", "logs": logs}
 
@@ -783,8 +837,8 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
             preds = predictor.predict(test_data)
             mean_series = preds["mean"]
             real_series = test_data[target]
-            real_tail = real_series.groupby(level="item_id").tail(fh).values
-            forecast_vals = mean_series.groupby(level="item_id").tail(fh).values
+            real_tail = real_series.groupby(level="item_id").tail(prediction_length).values
+            forecast_vals = mean_series.groupby(level="item_id").tail(prediction_length).values
         except Exception as e:
             return {"error": f"Prediction failed: {e}", "logs": logs}
 
@@ -797,23 +851,28 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2) -> 
         # ---------- Extract data for visualization ----------
         train_timestamps = train_data.index.get_level_values('timestamp')
         train_values = train_data[target].values
-        forecast_timestamps = test_data.index.get_level_values('timestamp')[-fh:]
-        forecast_actuals = test_data[target].iloc[-fh:].values
+        forecast_timestamps = test_data.index.get_level_values('timestamp')[-prediction_length:]
+        forecast_actuals = test_data[target].iloc[-prediction_length:].values
         forecast_preds = preds['mean'].values
+
+        # ---------- Output path definition ----------
+        output_path = "agentai/results/forecast/test/" 
+        os.makedirs(output_path, exist_ok=True)
+        logs.append(f"Output path set to: {output_path}")
 
         # ---------- Save CSV ----------
         _save_predictions_csv(forecast_timestamps, forecast_actuals, forecast_preds, preds, output_path, logs)
 
         # ---------- Generate Plots ----------
-        _plot_main_forecast(train_timestamps, train_values, forecast_timestamps, 
-                            forecast_actuals, forecast_preds, preds, target, output_path, logs)
+        # _plot_main_forecast(train_timestamps, train_values, forecast_timestamps, 
+        #                     forecast_actuals, forecast_preds, preds, target, output_path, logs)
         
         _plot_forecast_vs_actual(forecast_timestamps, forecast_actuals, forecast_preds, 
                                 preds, target, output_path, logs)
         
-        _plot_error_histogram(forecast_actuals, forecast_preds, output_path, logs)
+        # _plot_error_histogram(forecast_actuals, forecast_preds, output_path, logs)
         
-        _plot_error_over_time(forecast_timestamps, forecast_actuals, forecast_preds, output_path, logs)
+        # _plot_error_over_time(forecast_timestamps, forecast_actuals, forecast_preds, output_path, logs)
 
         # ---------- Compute Metrics ----------
         try:

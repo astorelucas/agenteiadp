@@ -83,7 +83,7 @@ class WorkflowExecutor:
         """Executa o grafo e imprime apenas o resultado final."""
         config = {"configurable": {"thread_id": thread_id}}
 
-        initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message, "is_before_dp": True}
+        initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message}
 
         final_state = {}
 

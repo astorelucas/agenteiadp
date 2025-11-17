@@ -1,10 +1,10 @@
-langchain>=0.3.27
-langchain-community>=0.3.29
-langchain-openai>=0.3.32
-langchain-anthropic>=0.3.19
-langchain-huggingface>=0.3.1
-langchain-experimental>=0.3.4
-langchain-tavily>=0.2.11
+langchain==0.3.27
+langchain-community==0.3.29
+langchain-openai==0.3.32
+langchain-anthropic==0.3.19
+langchain-huggingface==0.3.1
+langchain-experimental==0.3.4
+langchain-tavily==0.2.11
 python-dotenv>=1.1.1
 pydantic>=2.11.7
 duckduckgo-search>=8.1.1

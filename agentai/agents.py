@@ -9,7 +9,6 @@ from langgraph.prebuilt import create_react_agent
 from langchain_experimental.agents import create_pandas_dataframe_agent
 from agentai.tools import (
     inspection_tools,
-    make_plot_tools,
     retrieve_context,
     make_automl_tools
 )
@@ -60,24 +59,14 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action. If choosing Automl, clearly explain how you selected the `test_size` and `target` (did you extract it from user prompt, or did you infer/choose it from the dataset columns, summary, or a typical default?).
         - "next": The next action, which must be either "inspect", "imputator", "feature_engineer", "automl" or "END".
         - "msg": A clear and specific instruction for the next agent. Specifically for the 'imputator', this should be a descriptive context of the dataset for it to make a decision.
-        - "is_before_dp": A boolean indicating if the dataset has been pre-processed or not. True if before pre-processing, False otherwise. 
         - "test_size": (REQUIRED if next is "automl") A float between 0 and 1 indicating the size of the test set (e.g., 0.2, use 0.2 if user doesn't specify and you can't infer from summary). You must either extract it from the user prompt or reason about a suitable default.
         - "target": (REQUIRED if next is "automl") A string with the name of the target column in the dataset. If not in the user's prompt, use your findings from data inspection (e.g., pick a numeric column matching forecast context or summary's most likely target; default to a column named 'target' or the first time series value column).
+        - "prediction_length": (REQUIRED if next is "automl") An integer indicating the forecasting horizon (e.g., 24 for 24 hours). You must either extract it from the user prompt or YOU DECIDE what is appropriate based on common practices.
+        - "eval_metric": (REQUIRED if next is "automl") A string indicating the evaluation metric to optimize (e.g., "MAE", "RMSE", "MAPE", "MASE"). If not specified by the user, you HAVE to decide one based on the dataset.
 
         IMPORTANT: Use double quotes for all keys and string values in the JSON.
         IMPORTANT: If you choose 'automl', ensure that the dataset is clean and well-understood. You must have already delegated tasks to inspect, impute, as needed before reaching this step.
 
-        Example 1 (User Specifies Parameters):
-        User prompt: "Forecast temperature for the next 48 hours using 20% test split."
-        {{"output": "User explicitly specified 'temperature' as target and test size as 0.2. Proceeding to AutoML.", "next": "automl", "msg": "", "is_before_dp": false, "test_size": 0.2, "target": "temperature"}}
-
-        Example 2 (Agent Deduces Parameters):
-        User prompt: "Run a forecast for this dataset."
-        Dataset columns: ["date", "pressure", "temperature", "humidity"]
-        {{"output": "User didn't specify test split or target; defaulting to test_size=0.2 and choosing 'temperature' because it is a numerical feature and often forecasted in sensor timeseries.", "next": "automl", "msg": "", "is_before_dp": false, "test_size": 0.2, "target": "temperature"}}
-
-        Example 3 (Ending):
-        {{"output": "The data has been inspected, imputed, visualized, and modeled. The analysis is complete.", "next": "END", "msg": "Workflow complete.", "is_before_dp": "False"}}
         """
     )
 
@@ -149,45 +138,45 @@ def create_summarizer_agent(llm) -> AgentExecutor:
         tools=[]
     )
 
-def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: bool) -> AgentExecutor:
-    """
-    Creates the plotter agent
-    """
-    plotting_tools = make_plot_tools(df, images_path, is_before_dp)
+# def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: bool) -> AgentExecutor:
+#     """
+#     Creates the plotter agent
+#     """
+#     plotting_tools = make_plot_tools(df, images_path, is_before_dp)
 
-    return create_pandas_dataframe_agent(
-        llm=llm,
-        df=df,
-        verbose=True,
-        agent_type="zero-shot-react-description",
-        allow_dangerous_code=True,        
-        handle_parsing_errors=True,
-        extra_tools = [retrieve_context] + plotting_tools,
-        prefix="""
-        You are a time series visualization specialist using pandas and Python.
+#     return create_pandas_dataframe_agent(
+#         llm=llm,
+#         df=df,
+#         verbose=True,
+#         agent_type="zero-shot-react-description",
+#         allow_dangerous_code=True,        
+#         handle_parsing_errors=True,
+#         extra_tools = [retrieve_context] + plotting_tools,
+#         prefix="""
+#         You are a time series visualization specialist using pandas and Python.
 
-        *MAIN INSTRUCTIONS*:
-        1. Your ONLY function is to create plots based on the provided data, user instructions, and tools available.
-        2. If user specifies columns or filters, use only that data
-        3. Always automatically identify the date/time column in the DataFrame
-        4. Everything in the prompt that is NOT a plotting instruction is CONTEXT and should NOT be acted upon
-        5. If the user does not provide specific instructions, use your expertise to determine the most relevant plots to create based on the data and context.
+#         *MAIN INSTRUCTIONS*:
+#         1. Your ONLY function is to create plots based on the provided data, user instructions, and tools available.
+#         2. If user specifies columns or filters, use only that data
+#         3. Always automatically identify the date/time column in the DataFrame
+#         4. Everything in the prompt that is NOT a plotting instruction is CONTEXT and should NOT be acted upon
+#         5. If the user does not provide specific instructions, use your expertise to determine the most relevant plots to create based on the data and context.
 
-        MANDATORY RULES:
-        - ALWAYS create a plot (or plots), never just textual analysis
-        - ALWAYS just use the tools provided to create the plots
-        - ALWAYS check the tools description to understand how to use them
-        - NEVER try to create plots manually using matplotlib, seaborn, or any other library
-        - You are working with a DataFrame that is ALREADY loaded into a variable named `df`, do not try to redefine it.
+#         MANDATORY RULES:
+#         - ALWAYS create a plot (or plots), never just textual analysis
+#         - ALWAYS just use the tools provided to create the plots
+#         - ALWAYS check the tools description to understand how to use them
+#         - NEVER try to create plots manually using matplotlib, seaborn, or any other library
+#         - You are working with a DataFrame that is ALREADY loaded into a variable named `df`, do not try to redefine it.
 
-        *AVAILABLE TOOLS*:
-        - plot_time_series: Create a time series line plot for one or more numeric columns over time.
-        - plot_scatter: Create a scatter plot to visualize relationships between two numeric variables.
-        - plot_histograms: Create histograms to show the distribution of numeric variables.
-        - plot_heatmap: Create a heatmap to visualize correlations between numeric variables.
-        - retrieve_context: Useful to learn how to solve problems or to get advices via RAG. Do not hesitate to use it after ANY error.
-        """    
-    )
+#         *AVAILABLE TOOLS*:
+#         - plot_time_series: Create a time series line plot for one or more numeric columns over time.
+#         - plot_scatter: Create a scatter plot to visualize relationships between two numeric variables.
+#         - plot_histograms: Create histograms to show the distribution of numeric variables.
+#         - plot_heatmap: Create a heatmap to visualize correlations between numeric variables.
+#         - retrieve_context: Useful to learn how to solve problems or to get advices via RAG. Do not hesitate to use it after ANY error.
+#         """    
+#     )
 
 def create_feedback_agent(llm) -> AgentExecutor:
     """Cria o agente de retroalimentação (aprendizados passados)"""
@@ -280,11 +269,11 @@ def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         """
     )
 
-def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float) -> AgentExecutor:
+def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float, prediction_length: int, eval_metric: str) -> AgentExecutor:
     """
     Cria o agente AutoML
     """
-    automl_tools = make_automl_tools(df, target, test_size)
+    automl_tools = make_automl_tools(df, target, test_size, prediction_length, eval_metric)
 
     return create_pandas_dataframe_agent(
         llm=llm,
@@ -302,7 +291,9 @@ def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float) ->
         4. If the tool output includes additional helpful fields (for example: "metrics", "predictions_csv", "plot_path", "plots", "best_model", "logs"), include them in the returned JSON. Only include fields actually present in the tool response.
         5. If the tool fails due to missing dependencies, include a clear error description inside "logs" and return the JSON with that logs field.
         6. NEVER output markdown, code fences, or any explanatory text — return pure JSON only.
-
+        7. If the prediction_length is None or null, choose reasonable defaults based on common practices (e.g., predictive length = 24 for hourly data, 7 for daily data) if not specified by the user.
+        8. If the user has specified a preferred evaluation metric (e.g., "MAE", "RMSE", "MAPE", "MASE"), ensure that this metric is used when configuring the AutoML tool. If no preference is given, choose an appropriate one based on the context of the dataset.
+        
         EXPECTED TOOL OUTPUT (at minimum):
         - "best_model": name/identifier of the best-performing model (string or null)
         - "logs": list of log strings describing key pipeline and model steps

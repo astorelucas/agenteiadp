@@ -11,7 +11,6 @@ from agentai.agents import (
     create_pandas_agent,
     create_supervisor_agent,
     create_imputator_agent,
-    create_plotter_agent,
     create_feedback_agent,
     create_feature_engineering_agent,
     create_automl_agent,
@@ -209,7 +208,6 @@ class SupervisorNode(Node):
         next_step = plan.get("next", "END")
         msg_out = plan.get("msg", state.get("msg"))
         output = plan.get("output", "")
-        is_before_dp = plan.get("is_before_dp")
         logs.append(f"\n[Supervisor Node] Decision made: {output}")
         
         return_state = {
@@ -217,14 +215,15 @@ class SupervisorNode(Node):
             "msg": msg_out,
             "logs": logs,
             "subagents_report": None,
-            "is_before_dp": is_before_dp,
             "main_goal": main_goal
         }
 
         if next_step == "automl":
             test_size = plan.get("test_size")
             target = plan.get("target")
-            return_state = {**return_state, "test_size": test_size, "target": target}
+            prediction_length = plan.get("prediction_length")
+            eval_metric = plan.get("eval_metric")
+            return_state = {**return_state, "test_size": test_size, "target": target, "prediction_length": prediction_length, "eval_metric": eval_metric}
 
         return return_state
     
@@ -247,31 +246,31 @@ class RetrieverNode(Node):
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
     
-class PlotterNode(Node):
-    def __init__(self, executor):
-        super().__init__("plot")
-        self.executor = executor
-        self.agent = create_plotter_agent(self.executor.df, self.executor.images_path, self.executor.llm)
+# class PlotterNode(Node):
+#     def __init__(self, executor):
+#         super().__init__("plot")
+#         self.executor = executor
+#         self.agent = create_plotter_agent(self.executor.df, self.executor.images_path, self.executor.llm)
 
-    def execute(self, state: AgentState) -> dict:
-        msg = state.get("msg", "").lower()
-        logs = state.get("logs", [])
+#     def execute(self, state: AgentState) -> dict:
+#         msg = state.get("msg", "").lower()
+#         logs = state.get("logs", [])
 
-        input_message = (
-            f"Create plots to help analyze the dataset based on the following instruction: '{msg}'.\n"
-            f"If the instruction is not clear, create simple plots like scatter, time series, heatmap and histogram.\n"
-        )
+#         input_message = (
+#             f"Create plots to help analyze the dataset based on the following instruction: '{msg}'.\n"
+#             f"If the instruction is not clear, create simple plots like scatter, time series, heatmap and histogram.\n"
+#         )
         
-        report = f"\n[Plotter Node] "
+#         report = f"\n[Plotter Node] "
 
-        try:
-            response = self.agent.invoke({"input": input_message})
-            report += response.get("output", "") or str(response)
-        except Exception as e:
-            report += f"Time series agent failed to execute instruction. Error: {e}"
+#         try:
+#             response = self.agent.invoke({"input": input_message})
+#             report += response.get("output", "") or str(response)
+#         except Exception as e:
+#             report += f"Time series agent failed to execute instruction. Error: {e}"
         
-        logs.append(report)
-        return {"subagents_report": report, "logs": logs}
+#         logs.append(report)
+#         return {"subagents_report": report, "logs": logs}
 
 class FeedbackNode(Node):
     def __init__(self, executor):
@@ -343,7 +342,7 @@ class AutoMLNode(Node):
         target = state.get("target")
         if not isinstance(target, str) or not target or target not in self.executor.df.columns:
             error_message = f"Invalid or missing target column: {target!r}. It must be a non-empty string present in the dataset columns."
-            logs.append(f"[AutoML Node] {error_message}")
+            logs.append(f"[AutoML Node] {error_message}. RETURN TO SUPERVISOR OR USE RETRIEVER TO DECIDE.")
             return {"subagents_report": error_message, "logs": logs}
 
         # Range validation (already robust)
@@ -352,8 +351,22 @@ class AutoMLNode(Node):
             logs.append(f"[AutoML Node] {error_message}")
             return {"subagents_report": error_message, "logs": logs}
 
+        prediction_length = state.get("prediction_length")
+        if prediction_length is None:
+            logs.append(f"[AutoML Node] Forecasting horizon (prediction_length) is not specified, RETURN TO SUPERVISOR OR USE RETRIEVER TO DECIDE.")
+            return {"subagents_report": f"Forecasting horizon (prediction_length) is not specified, please select one before proceeding.", "logs": logs}
+        else:
+            logs.append(f"[AutoML Node] Using default forecasting horizon (prediction_length) of {prediction_length}.")
+
+        eval_metric = state.get("eval_metric")  # default evaluation metric
+        if eval_metric is None:
+            logs.append(f"[AutoML Node] Evaluation metric (eval_metric) is not specified, RETURN TO SUPERVISOR OR USE RETRIEVER TO DECIDE.")
+            return {"subagents_report": f"Evaluation metric (eval_metric) is not specified, please select one before proceeding.", "logs": logs}
+        else:
+            logs.append(f"[AutoML Node] Using evaluation metric: {eval_metric}.")
+
         if self.automl_agent is None:
-            automl_agent = create_automl_agent(self.executor.df, self.executor.llm, target, test_size)
+            automl_agent = create_automl_agent(self.executor.df, self.executor.llm, target, test_size, prediction_length, eval_metric)
 
         try:
             # Invoke the AutoML agent

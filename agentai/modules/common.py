@@ -15,6 +15,7 @@ class AgentState(TypedDict):
     msg: Optional[str]
     subagents_report: Optional[str]
     next: Optional[str]
-    is_before_dp: Optional[bool]  # flag to indicate if we are before data preprocessing
     test_size: Optional[int]
     target: Optional[str]
+    prediction_length: Optional[int]  # forecasting horizon
+    eval_metric: Optional[str]

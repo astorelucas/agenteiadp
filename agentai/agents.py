@@ -20,6 +20,7 @@ def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         verbose=True,
         agent_type="zero-shot-react-description",
         allow_dangerous_code=True,
+        handle_parsing_errors=True,
         extra_tools= inspection_tools + [retrieve_context],
         prefix="""
         You are a Python data analysis agent working with a pandas DataFrame. Your goal is to answer the user's question by performing analysis on a pre-loaded DataFrame.

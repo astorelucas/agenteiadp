@@ -23,11 +23,11 @@ def load_env_variables():
 
 def execute_pipeline():
     load_env_variables()
-    llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct", max_tokens=500)
+    llm = ChatDeepInfra(model="Qwen/Qwen3-Next-80B-A3B-Instruct", max_tokens=500)
     
     print("*** Iniciando o pipeline ***\n\n")
 
-    csv_path = "agentai/datasets/ETTh1.csv"
+    csv_path = "agentai/datasets/national_illness.csv"
     plot_images_path = "images/plots"
 
     try:
@@ -47,7 +47,7 @@ def execute_pipeline():
     # unique ID
     thread_id = str(uuid4())
 
-    initial_prompt = "just check the missing value in the dataset and try to fill it using appropriate techniques. After that, perform a forecasting task for the 'OT' column using appropriate models and techniques."
+    initial_prompt = "just check the missing value in the dataset and try to fill it using appropriate techniques. After that, perform a forecasting task for the '% WEIGHTED ILI' column using appropriate models and techniques. prediction length is 60. Finally, provide a summary of the steps taken and the results obtained. "
     executor.invoke(initial_message=initial_prompt, thread_id=thread_id)
 
 if __name__ == "__main__":

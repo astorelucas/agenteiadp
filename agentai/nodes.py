@@ -8,11 +8,8 @@ from langchain_core.messages import HumanMessage
 from agentai.modules.common import AgentState
 from agentai.rag import RAG
 from agentai.agents import (
-    create_pandas_agent,
     create_supervisor_agent,
-    create_imputator_agent,
     create_feedback_agent,
-    create_feature_engineering_agent,
     create_automl_agent,
     create_summarizer_agent
 )
@@ -48,126 +45,126 @@ class AgentThoughtCollector(BaseCallbackHandler):
         if hasattr(action, 'log'):
             self.thoughts.append(action.log)
 
-class FeatureEngineeringNode(Node):
-    def __init__(self, executor):
-        super().__init__("feature_engineer")
-        self.executor = executor
-        self.agent = create_feature_engineering_agent(self.executor.df, self.executor.llm)
+# class FeatureEngineeringNode(Node):
+#     def __init__(self, executor):
+#         super().__init__("feature_engineer")
+#         self.executor = executor
+#         self.agent = create_feature_engineering_agent(self.executor.df, self.executor.llm)
 
-    def execute(self, state: AgentState) -> dict:
-        logs = state.get("logs", [])
-        msg = state.get("msg", "")
+#     def execute(self, state: AgentState) -> dict:
+#         logs = state.get("logs", [])
+#         msg = state.get("msg", "")
         
-        thought_collector = AgentThoughtCollector()
+#         thought_collector = AgentThoughtCollector()
 
-        if self.executor.df is None:
-            error_report = "[FeatureEngineeringNode] No DataFrame available on executor."
-            logs.append(error_report)
-            return {"subagents_report": error_report, "logs": logs}
+#         if self.executor.df is None:
+#             error_report = "[FeatureEngineeringNode] No DataFrame available on executor."
+#             logs.append(error_report)
+#             return {"subagents_report": error_report, "logs": logs}
 
-        try:
+#         try:
             
-            response = self.agent.invoke({"input": msg}, config={"callbacks": [thought_collector]})
-            report = response.get("output", "") or str(response)
+#             response = self.agent.invoke({"input": msg}, config={"callbacks": [thought_collector]})
+#             report = response.get("output", "") or str(response)
 
-            full_thought_process = thought_collector.thoughts
+#             full_thought_process = thought_collector.thoughts
             
-            complete_report = (
-                f"{full_thought_process}\n"
-                f"FINAL REPORT:{report}"
-            )
+#             complete_report = (
+#                 f"{full_thought_process}\n"
+#                 f"FINAL REPORT:{report}"
+#             )
 
-            logs.append(f"[FeatureEngineeringNode] {complete_report}")
-            return {"subagents_report": complete_report, "logs": logs}
+#             logs.append(f"[FeatureEngineeringNode] {complete_report}")
+#             return {"subagents_report": complete_report, "logs": logs}
 
-        except Exception as e:
-            error_report = f"[FeatureEngineeringNode] Error: {e}"
-            logs.append(error_report)
-            return {"subagents_report": error_report, "logs": logs}
+#         except Exception as e:
+#             error_report = f"[FeatureEngineeringNode] Error: {e}"
+#             logs.append(error_report)
+#             return {"subagents_report": error_report, "logs": logs}
 
-class PandasNode(Node):
-    """Run a pandas-capable inspection agent against the executor.df"""
-    def __init__(self, executor):
-        super().__init__("inspect")
-        self.executor = executor
-        self.agent = create_pandas_agent(self.executor.df, self.executor.llm)
+# class PandasNode(Node):
+#     """Run a pandas-capable inspection agent against the executor.df"""
+#     def __init__(self, executor):
+#         super().__init__("inspect")
+#         self.executor = executor
+#         self.agent = create_pandas_agent(self.executor.df, self.executor.llm)
 
-    def execute(self, state: AgentState) -> dict:
-        msg = state.get("msg", "")
-        logs = state.get("logs", [])
-        max_retries = 2
-        current_input = msg
-        report = "\n[Pandas Node] "
+#     def execute(self, state: AgentState) -> dict:
+#         msg = state.get("msg", "")
+#         logs = state.get("logs", [])
+#         max_retries = 2
+#         current_input = msg
+#         report = "\n[Pandas Node] "
 
-        thought_collector = AgentThoughtCollector()
+#         thought_collector = AgentThoughtCollector()
 
 
-        for attempt in range(max_retries + 1):
-            try:
-                response = self.agent.invoke(
-                    {"input": current_input},
-                    config={"callbacks": [thought_collector]}
-                )
-                report += response.get("output", "") or str(response)
-                break
-            except Exception as e:
-                logs.append(f"Attempt {attempt + 1}/{max_retries + 1} failed for instruction '{msg}'. Error: {e}")
-                if attempt == max_retries:
-                    report += f"Agent failed after {max_retries + 1} attempts. Final Error: {e}"
-                    break
+#         for attempt in range(max_retries + 1):
+#             try:
+#                 response = self.agent.invoke(
+#                     {"input": current_input},
+#                     config={"callbacks": [thought_collector]}
+#                 )
+#                 report += response.get("output", "") or str(response)
+#                 break
+#             except Exception as e:
+#                 logs.append(f"Attempt {attempt + 1}/{max_retries + 1} failed for instruction '{msg}'. Error: {e}")
+#                 if attempt == max_retries:
+#                     report += f"Agent failed after {max_retries + 1} attempts. Final Error: {e}"
+#                     break
 
-                current_input = f"Your previous attempt failed with this error: {e}. Please correct your code and try again to accomplish the original task: {msg}"
+#                 current_input = f"Your previous attempt failed with this error: {e}. Please correct your code and try again to accomplish the original task: {msg}"
             
-        full_thought_process = "\n".join(thought_collector.thoughts)
+#         full_thought_process = "\n".join(thought_collector.thoughts)
         
-        complete_report = (
-            f"{full_thought_process}\n"
-            f"FINAL REPORT:{report}"
-        )
+#         complete_report = (
+#             f"{full_thought_process}\n"
+#             f"FINAL REPORT:{report}"
+#         )
 
-        logs.append(f"[Pandas Node]: {complete_report}")
+#         logs.append(f"[Pandas Node]: {complete_report}")
 
-        return {"subagents_report": complete_report, "logs": logs}
+#         return {"subagents_report": complete_report, "logs": logs}
 
-class ImputatorNode(Node):
-    def __init__(self, executor):
-        super().__init__("imputator")
-        self.executor = executor
-        self.imputator_agent = create_imputator_agent(self.executor.llm)
+# class ImputatorNode(Node):
+#     def __init__(self, executor):
+#         super().__init__("imputator")
+#         self.executor = executor
+#         self.imputator_agent = create_imputator_agent(self.executor.llm)
 
-    def execute(self, state: AgentState) -> dict:
-        context = state.get("msg", "")
-        logs = state.get("logs", [])
+#     def execute(self, state: AgentState) -> dict:
+#         context = state.get("msg", "")
+#         logs = state.get("logs", [])
     
-        response = self.imputator_agent.invoke({"messages": [HumanMessage(content=context)]})
-        raw_output = str(response.get("messages", [])[-1].content)
-        json_str_match = re.search(r'\{.*\}', raw_output, re.DOTALL)
+#         response = self.imputator_agent.invoke({"messages": [HumanMessage(content=context)]})
+#         raw_output = str(response.get("messages", [])[-1].content)
+#         json_str_match = re.search(r'\{.*\}', raw_output, re.DOTALL)
 
-        report = f"\n[Imputator Node] "
+#         report = f"\n[Imputator Node] "
 
-        if not json_str_match:
-            report += f"Error: Imputator agent failed to produce valid JSON. Output: {raw_output}"
-            logs.append(f"\n {report}")
-            return {"subagents_report": report, "logs": logs}
+#         if not json_str_match:
+#             report += f"Error: Imputator agent failed to produce valid JSON. Output: {raw_output}"
+#             logs.append(f"\n {report}")
+#             return {"subagents_report": report, "logs": logs}
 
-        try:
-            decision = json.loads(json_str_match.group(0))
-            method = decision.get("method")
-            params = decision.get("params", {})
+#         try:
+#             decision = json.loads(json_str_match.group(0))
+#             method = decision.get("method")
+#             params = decision.get("params", {})
 
-            report += f"Imputator agent decided on method '{method}' with params {params}."
+#             report += f"Imputator agent decided on method '{method}' with params {params}."
 
-            strategy = self.executor.factory.create_strategy(name=method, **params)
-            imputed_df = strategy.execute(self.executor.df)
-            self.executor.df = imputed_df
-            report += f"Imputation using '{method}' strategy completed successfully."
+#             strategy = self.executor.factory.create_strategy(name=method, **params)
+#             imputed_df = strategy.execute(self.executor.df)
+#             self.executor.df = imputed_df
+#             report += f"Imputation using '{method}' strategy completed successfully."
 
-        except (json.JSONDecodeError, ValueError, TypeError) as e:
-            report += f"JSON error processing imputator agent decision: {e}. Raw output: {raw_output}"
+#         except (json.JSONDecodeError, ValueError, TypeError) as e:
+#             report += f"JSON error processing imputator agent decision: {e}. Raw output: {raw_output}"
             
 
-        logs.append(report)
-        return {"subagents_report": report, "logs": logs}
+#         logs.append(report)
+#         return {"subagents_report": report, "logs": logs}
 
 class SupervisorNode(Node):
     def __init__(self, executor):

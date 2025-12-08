@@ -1,14 +1,14 @@
 # OPA – Observe, Preprocess, and Act
 
-Projeto desenvolvido pelo Projeto Agents-of-Future do FutureLab (DCC-UFMG) em Parceria com a KUNUMI S/A.
+Project developed by the Agents-of-Future initiative of FutureLab (DCC-UFMG) in partnership with KUNUMI S/A.
 
-# Arquitetura
+# OPA Architecture
 
 >  <p align="left">
 >  <img src="https://github.com/astorelucas/agenteiadp/blob/main/agentai/workflow_graph.png?raw=true" alt="Arquitetura" width="500"/>
 >  </p> 
 
-## Estrutura do Repositório
+## Structure
 
 ```plaintext
 
@@ -36,7 +36,7 @@ agenteiadp/
 
 ---
 
-## Colaboradores
+## Authors
 
 - Gabriel de Souza Gomes
 - Lucas Malacarne Astore

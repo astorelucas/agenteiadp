@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 import sys
 import os
 from uuid import uuid4
+import argparse
+
 
 import matplotlib
 matplotlib.use('Agg')
@@ -21,7 +23,7 @@ def load_env_variables():
         raise ValueError("DEEPINFRA_API_KEY não encontrada.")
     os.environ["DEEPINFRA_API_KEY"] = api_key
 
-def execute_pipeline():
+def execute_pipeline(prediction_length=60):
     load_env_variables()
     llm = ChatDeepInfra(model="Qwen/Qwen3-Next-80B-A3B-Instruct", max_tokens=500)
     
@@ -47,8 +49,13 @@ def execute_pipeline():
     # unique ID
     thread_id = str(uuid4())
 
-    initial_prompt = "just check the missing value in the dataset and try to fill it using appropriate techniques. After that, perform a forecasting task for the '% WEIGHTED ILI' column using appropriate models and techniques. prediction length is 60. Finally, provide a summary of the steps taken and the results obtained. "
+    initial_prompt = f"just check the missing value in the dataset and try to fill it using appropriate techniques. After that, perform a forecasting task for the '% WEIGHTED ILI' column using appropriate models and techniques. prediction length is {prediction_length}. Finally, provide a summary of the steps taken and the results obtained. "
     executor.invoke(initial_message=initial_prompt, thread_id=thread_id)
 
 if __name__ == "__main__":
-    execute_pipeline()
+    parser = argparse.ArgumentParser(description="Executar pipeline de forecasting")
+    parser.add_argument("--prediction_length", type=int, default=60, 
+                       help="Comprimento da previsão (padrão: 60)")
+    
+    args = parser.parse_args()
+    execute_pipeline(prediction_length=args.prediction_length)

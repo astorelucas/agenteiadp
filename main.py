@@ -29,7 +29,7 @@ def execute_pipeline(prediction_length=60):
     
     print("*** Iniciando o pipeline ***\n\n")
 
-    csv_path = "agentai/datasets/national_illness.csv"
+    csv_path = "agentai/datasets/ETTm1.csv"
     plot_images_path = "images/plots"
 
     try:
@@ -49,7 +49,7 @@ def execute_pipeline(prediction_length=60):
     # unique ID
     thread_id = str(uuid4())
 
-    initial_prompt = f"just check the missing value in the dataset and try to fill it using appropriate techniques. After that, perform a forecasting task for the '% WEIGHTED ILI' column using appropriate models and techniques. prediction length is {prediction_length}. Finally, provide a summary of the steps taken and the results obtained. "
+    initial_prompt = f"Perform a forecasting task for the 'OT' column using appropriate models and techniques. prediction length is {prediction_length}. Finally, provide a summary of the steps taken and the results obtained. "
     executor.invoke(initial_message=initial_prompt, thread_id=thread_id)
 
 if __name__ == "__main__":

@@ -49,7 +49,7 @@ def execute_pipeline(prediction_length=60):
     # unique ID
     thread_id = str(uuid4())
 
-    initial_prompt = f"Perform a forecasting task for the 'OT' column using appropriate models and techniques. prediction length is {prediction_length}. Finally, provide a summary of the steps taken and the results obtained. "
+    initial_prompt = f"Perform a forecasting task for the 'OT' column using appropriate models and techniques. prediction length is {prediction_length}. Finally, provide a summary of the steps taken and the results obtained. The columns are date,HUFL,HULL,MUFL,MULL,LUFL,LULL,OT"
     executor.invoke(initial_message=initial_prompt, thread_id=thread_id)
 
 if __name__ == "__main__":

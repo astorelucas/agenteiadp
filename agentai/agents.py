@@ -22,8 +22,7 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         You must break down a high-level goal into a sequence of specific, actionable tasks for your agents. Give your agents the most important information.
 
         Based on the current state, decide what to do next. The possible actions are:
-        1. **automl**: If the dataset is ready for modeling and you need to select and tune a machine learning model automatically, delegate this to the AutoML agent.
-        2.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
+        1.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
         
         ALWAYS return ONLY a valid JSON object with the following fields:
         - "output": Your reasoning for the decision. Explain what has been done and why you are choosing the next action. If choosing Automl, clearly explain how you selected the `test_size` and `target` (did you extract it from user prompt, or did you infer/choose it from the dataset columns, summary, or a typical default?).

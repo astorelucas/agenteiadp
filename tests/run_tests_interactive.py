@@ -195,7 +195,7 @@ def run_agent_test(csv_path: str, dataset_name: str, prompt: str, output_dir: Pa
     
     # Criar LLM
     try:
-        llm = ChatDeepInfra(model="Qwen/Qwen2.5-72B-Instruct", max_tokens=500)
+        llm = ChatDeepInfra(model="Qwen/Qwen3-Next-80B-A3B-Instruct", max_tokens=500)
     except Exception as e:
         print(f"❌ Erro ao criar LLM: {e}")
         return None

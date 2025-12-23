@@ -10,7 +10,8 @@ from langchain_experimental.agents import create_pandas_dataframe_agent
 from agentai.tools import (
     inspection_tools,
     retrieve_context,
-    make_automl_tools
+    make_automl_tools,
+    python_repl_sanitizer
 )
 
 def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
@@ -21,7 +22,7 @@ def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         agent_type="zero-shot-react-description",
         allow_dangerous_code=True,
         handle_parsing_errors=True,
-        extra_tools= inspection_tools + [retrieve_context],
+        extra_tools= inspection_tools + [retrieve_context, python_repl_sanitizer],
         prefix="""
         You are a Python data analysis agent working with a pandas DataFrame. Your goal is to answer the user's question by performing analysis on a pre-loaded DataFrame.
 
@@ -229,9 +230,10 @@ def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         llm=llm,
         df=df,
         verbose=True,
-        extra_tools=[retrieve_context],
+        extra_tools=[retrieve_context, python_repl_sanitizer],
         agent_type="zero-shot-react-description",
         allow_dangerous_code=True,
+        handle_parsing_errors=True,
         prefix="""
         You are a **World-Class Feature Engineering expert** working with a pandas DataFrame called `df`.
 
@@ -281,7 +283,8 @@ def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float, pr
         df=df,
         verbose=True,
         allow_dangerous_code=True,
-        extra_tools=automl_tools,
+        handle_parsing_errors=True,
+        extra_tools=[python_repl_sanitizer] + automl_tools,
         prefix="""
         You are an AutoML Agent specialized in time series forecasting. You have access to the tool `autogluon_forecast`.
 
@@ -324,5 +327,4 @@ def create_automl_agent(df: pd.DataFrame, llm, target: str, test_size: float, pr
         - Minimality: do not add explanations, human-readable commentary, or extra keys.
         - Valid JSON only: ensure the output is parseable JSON (no comments, no trailing commas).
         """
-
-  )
+    )

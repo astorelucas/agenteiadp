@@ -81,7 +81,12 @@ class WorkflowExecutor:
         
     def invoke(self, initial_message: str, thread_id: str):
         """Executa o grafo e imprime apenas o resultado final."""
-        config = {"configurable": {"thread_id": thread_id}}
+        # Increase recursion limit for complex graphs; also pass via config for compatibility
+        recursion_limit = 200
+        config = {
+            "configurable": {"thread_id": thread_id},
+            "recursion_limit": recursion_limit,
+        }
 
         initial_state = {"msg": initial_message, "logs": [], "main_goal": initial_message}
 
@@ -89,26 +94,34 @@ class WorkflowExecutor:
 
         print("\n--- INICIANDO EXECUÇÃO DO GRAFO ---")
 
-        for chunk in self.graph.stream(initial_state, config=config, recursion_limit=35):
-            
-            for node_name, state in chunk.items():
-                print(f"\n--- [ Nó Executado: {node_name} ] ---")
+        try:
+            for chunk in self.graph.stream(initial_state, config=config, recursion_limit=recursion_limit):
+                for node_name, state in chunk.items():
+                    print(f"\n--- [ Nó Executado: {node_name} ] ---")
 
-                if report := state.get("subagents_report"):
-                    print("Relatório:")
-                    print(report)
+                    if report := state.get("subagents_report"):
+                        print("Relatório:")
+                        print(report)
+                        if node_name == "supervisor":
+                            print("-" * 25)
+
                     if node_name == "supervisor":
-                        print("-" * 25)
+                        print(f"Próximo passo planejado: '{state.get('next')}'")
+                        print(f"Instrução para o próximo agente: \"{state.get('msg')}\"")
 
-                if node_name == "supervisor":
-                    print(f"Próximo passo planejado: '{state.get('next')}'")
-                    print(f"Instrução para o próximo agente: \"{state.get('msg')}\"")
+                    elif node_name == "summarizer":
+                        print("Execução concluída. Gerando resumo...")
 
-                elif node_name == "summarizer":
-                    print("Execução concluída. Gerando resumo...")
+                    if state:
+                        final_state = state
 
-                if state:
-                    final_state = state
+        except Exception as e:
+            # Provide clearer guidance for Graph recursion errors
+            err_str = str(e)
+            print(f"\n❌ Erro durante execução do grafo: {err_str}")
+            if 'recursion' in err_str.lower():
+                print(f"Sugestão: aumentar 'recursion_limit' (atualmente {recursion_limit}) ou revisar a lógica do Supervisor para garantir término.")
+            raise
 
         print("\n\n--- FIM DA EXECUÇÃO DO GRAFO ---")
         

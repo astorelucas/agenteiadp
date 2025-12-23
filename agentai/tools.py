@@ -23,7 +23,11 @@ from typing import List, Optional, Tuple, Dict, Any
 from abc import ABC, abstractmethod
 from agentai.rag import RAG
 
-from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
+# NOTE: AutoGluon imports are lazy inside autogluon_forecast; do not import them at module import time
+# from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
+
+import re
+import ast
 
 # abstract class 
 class ImputationStrategy(ABC):
@@ -668,7 +672,7 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2, pre
             # Erros absolutos
             ax1.plot(forecast_timestamps_list, errors, color='blue', linewidth=1.5, 
                     marker='o', markersize=4, label='Prediction error')
-            ax1.axhline(y=0, color='green', linestyle='--', linewidth=2, label='Perfect forecast')
+            ax1.axhline(x=0, color='green', linestyle='--', linewidth=2, label='Perfect forecast')
             
             if len(errors) >= 3:
                 window = min(5, len(errors) // 3)
@@ -688,7 +692,7 @@ def make_automl_tools(df: pd.DataFrame, target: str, test_size: float = 0.2, pre
             pct_errors = 100 * errors / forecast_actuals
             ax2.plot(forecast_timestamps_list, pct_errors, color='purple', linewidth=1.5,
                     marker='s', markersize=4, label='Percentage error')
-            ax2.axhline(y=0, color='green', linestyle='--', linewidth=2)
+            ax2.axhline(x=0, color='green', linestyle='--', linewidth=2)
             
             if len(pct_errors) >= 3:
                 window = min(5, len(pct_errors) // 3)
@@ -932,3 +936,103 @@ def retrieve_context(query: str) -> dict:
     return rag.retrieve(query)
 
 inspection_tools = [inspect_data]
+
+def sanitize_python_code(code: str) -> Tuple[str, List[str]]:
+    """Conservative sanitizer for LLM-generated Python payloads.
+
+    Returns (sanitized_code, removed_lines).
+    Heuristics (conservative):
+    - Remove lines that begin with common LLM commentary prefixes (Observation, Thought, Plan, Final Answer, etc.)
+    - Remove single bare identifiers (e.g., a lone "Observ") unless they are part of a def/class/import or assignment
+    - Remove lines that look like prose (alphabetic words + spaces with no Python punctuation like :,=,(),[],.,#)
+    - Preserve blank lines and code-like lines (starting with import, from, def, class, @, _, or containing '=', '(', ')', ':')
+    If all lines would be removed, return the original code to avoid destructive behavior.
+    """
+    if not isinstance(code, str):
+        return code, []
+
+    lines = code.splitlines()
+    removed = []
+    keep = []
+
+    commentary_prefixes = [
+        "observation",
+        "observation:",
+        "thought",
+        "thought:",
+        "plan",
+        "plan:",
+        "final answer",
+        "final answer:",
+        "answer",
+        "answer:",
+        "note",
+        "note:",
+        "analysis",
+        "analysis:",
+    ]
+
+    for ln in lines:
+        stripped = ln.strip()
+        if stripped == "":
+            keep.append(ln)
+            continue
+
+        low = stripped.lower()
+        # remove obvious LLM commentary lines
+        if any(low.startswith(p) for p in commentary_prefixes):
+            removed.append(ln)
+            continue
+
+        # preserve code that starts like common python constructs
+        if re.match(r"^(from\s+\w+|import\s+|def\s+|class\s+|@|#|\w+\s*=)", stripped):
+            keep.append(ln)
+            continue
+
+        # if line contains python punctuation characters, assume code
+        if any(ch in stripped for ch in ("=", "(", ")", ":", "[", "]", "#", ".")):
+            keep.append(ln)
+            continue
+
+        # if line is a single bare identifier (likely LLM stray token), remove it
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", stripped):
+            removed.append(ln)
+            continue
+
+        # if line is mostly prose (letters and spaces) with no punctuation, remove conservatively
+        if re.match(r"^[A-Za-z\s]+$", stripped) and len(stripped.split()) > 2:
+            removed.append(ln)
+            continue
+
+        # default: keep
+        keep.append(ln)
+
+    sanitized = "\n".join(keep).strip()
+    if sanitized == "":
+        # fallback: don't sanitize away everything
+        return code, removed
+
+    return sanitized, removed
+
+
+@tool
+def python_repl_sanitizer(code: str) -> dict:
+    """Agent-callable wrapper returning sanitized code and metadata.
+
+    Returns a dict: {"sanitized_code": str, "removed_lines": List[str], "warnings": List[str]}
+    The tool attempts an AST parse of the sanitized code and, if parsing fails, returns the original code and a warning.
+    """
+    warnings: List[str] = []
+    try:
+        sanitized, removed = sanitize_python_code(code)
+    except Exception as e:
+        return {"sanitized_code": code, "removed_lines": [], "warnings": [f"sanitizer_exception: {e}"]}
+
+    # Validate via AST
+    try:
+        ast.parse(sanitized)
+    except Exception as e:
+        warnings.append(f"AST parse failed for sanitized code: {e}; returning original code")
+        return {"sanitized_code": code, "removed_lines": removed, "warnings": warnings}
+
+    return {"sanitized_code": sanitized, "removed_lines": removed, "warnings": warnings}

@@ -3,6 +3,7 @@
 .jpeg
 .jpg
 .txt
+.venv
 __pycache__/
 tests/
 venv/

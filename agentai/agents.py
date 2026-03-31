@@ -21,7 +21,6 @@ def create_pandas_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         verbose=True,
         agent_type="zero-shot-react-description",
         allow_dangerous_code=True,
-        handle_parsing_errors=True,
         extra_tools= inspection_tools + [retrieve_context, python_repl_sanitizer],
         prefix="""
         You are a Python data analysis agent working with a pandas DataFrame. Your goal is to answer the user's question by performing analysis on a pre-loaded DataFrame.
@@ -50,7 +49,7 @@ def create_supervisor_agent(llm) -> AgentExecutor:
         Based on the current state, decide what to do next. The possible actions are:
         1.  **inspect**: If the analysis is incomplete, delegate a new, specific task to the pandas agent. The task should be a logical next step towards the main goal. 
         2.  **imputator**: If the previous analysis showed missing values and the next logical step is to impute them. You must delegate this to the imputation specialist.
-        3.  **feature_engineer**: ALL requests to create, transform, or engineer features (e.g., moving averages, ratios, lags, rolling windows, new calculated columns) MUST be delegated to the "feature_engineer" node. 
+        3.  **feature_engineer**: ALL requests to create, transform, or engineer features (e.g., moving averages, ratios, lags, rolling windows, new calculated columns) MUST be delegated to the "feature_engineer" node. Be cautious not to remove the timestamp column (date, timestamp) or change the index, and do not overcreate features. Only create features that are justified by the analysis and that show promise based on your findings.
         4. **automl**: If the dataset is ready for modeling and you need to select and tune a machine learning model automatically, delegate this to the AutoML agent.
         5.  **END**: If you have gathered all necessary information to fulfill the user's main goal and the analysis is complete. Do not hesitate to use it.
 
@@ -140,46 +139,6 @@ def create_summarizer_agent(llm) -> AgentExecutor:
         tools=[]
     )
 
-# def create_plotter_agent(df: pd.DataFrame, images_path: str, llm, is_before_dp: bool) -> AgentExecutor:
-#     """
-#     Creates the plotter agent
-#     """
-#     plotting_tools = make_plot_tools(df, images_path, is_before_dp)
-
-#     return create_pandas_dataframe_agent(
-#         llm=llm,
-#         df=df,
-#         verbose=True,
-#         agent_type="zero-shot-react-description",
-#         allow_dangerous_code=True,        
-#         handle_parsing_errors=True,
-#         extra_tools = [retrieve_context] + plotting_tools,
-#         prefix="""
-#         You are a time series visualization specialist using pandas and Python.
-
-#         *MAIN INSTRUCTIONS*:
-#         1. Your ONLY function is to create plots based on the provided data, user instructions, and tools available.
-#         2. If user specifies columns or filters, use only that data
-#         3. Always automatically identify the date/time column in the DataFrame
-#         4. Everything in the prompt that is NOT a plotting instruction is CONTEXT and should NOT be acted upon
-#         5. If the user does not provide specific instructions, use your expertise to determine the most relevant plots to create based on the data and context.
-
-#         MANDATORY RULES:
-#         - ALWAYS create a plot (or plots), never just textual analysis
-#         - ALWAYS just use the tools provided to create the plots
-#         - ALWAYS check the tools description to understand how to use them
-#         - NEVER try to create plots manually using matplotlib, seaborn, or any other library
-#         - You are working with a DataFrame that is ALREADY loaded into a variable named `df`, do not try to redefine it.
-
-#         *AVAILABLE TOOLS*:
-#         - plot_time_series: Create a time series line plot for one or more numeric columns over time.
-#         - plot_scatter: Create a scatter plot to visualize relationships between two numeric variables.
-#         - plot_histograms: Create histograms to show the distribution of numeric variables.
-#         - plot_heatmap: Create a heatmap to visualize correlations between numeric variables.
-#         - retrieve_context: Useful to learn how to solve problems or to get advices via RAG. Do not hesitate to use it after ANY error.
-#         """    
-#     )
-
 def create_feedback_agent(llm) -> AgentExecutor:
     """Cria o agente de retroalimentação (aprendizados passados)"""
     return create_react_agent(
@@ -233,7 +192,6 @@ def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
         extra_tools=[retrieve_context, python_repl_sanitizer],
         agent_type="zero-shot-react-description",
         allow_dangerous_code=True,
-        handle_parsing_errors=True,
         prefix="""
         You are a **World-Class Feature Engineering expert** working with a pandas DataFrame called `df`.
 
@@ -266,9 +224,19 @@ def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
             * You are **FORBIDDEN** from creating features with no variance (like 'year' if all data is from the same year, or 'hour' if data is daily).
 
         6.  **CONSTRAINTS:**
-            * Always update `df` directly (e.g., `df['new_col'] = ...`).
             * **FORBIDDEN:** Do not use `df.plot()`.
             * Use `retrieve_context` rag tool for errors or general advices on techniques and parameters.
+
+        7. **PERSISTENCE (CRITICAL):**
+            * ALL feature engineering MUST modify the original `df` in-place.
+            * Be CAUTIOUS with the new columns you create. Only keep those that are justified and show promise based on your analysis.
+            * You MUST NOT create a new DataFrame or overwrite `df`.
+            * Be sure you not remove the timestamp column (date, timestamp) or change the index, as it is crucial for time series forecasting.
+            * ALWAYS use direct column assignment:
+                df["new_feature"] = ...
+            * NEVER use:
+                df = df.copy()
+                df = df.assign(...)
         """
     )
 

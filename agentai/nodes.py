@@ -365,8 +365,38 @@ class AutoMLNode(Node):
         else:
             logs.append(f"[AutoML Node] Using evaluation metric: {eval_metric}.")
 
+        df = self.executor.df
+
+        # Normalize column names (remove stray spaces) to help timestamp detection
+        try:
+            df.columns = df.columns.str.strip()
+        except Exception:
+            pass
+
+        # Resolve ambiguity of timestamp:
+        # - If the DataFrame has a DatetimeIndex (even unnamed), bring it back as a column so the autogluon tool can detect it.
+        # - Also handle the case where the index has a name like 'date' or 'time' but that name is not present in columns.
+        try:
+            is_dt_index = isinstance(df.index, pd.DatetimeIndex)
+        except Exception:
+            is_dt_index = False
+
+        if is_dt_index and (df.index.name is None or df.index.name not in df.columns):
+            df = df.reset_index()
+        elif df.index.name and df.index.name not in df.columns and any(sub in str(df.index.name).lower() for sub in ("date", "time", "stamp")):
+            df = df.reset_index()
+
+        # Remove duplicated columns silently
+        df = df.loc[:, ~df.columns.duplicated()]
+
+        self.executor.df = df
+
+        # Create and persist the automl agent so it can be reused
         if self.automl_agent is None:
-            automl_agent = create_automl_agent(self.executor.df, self.executor.llm, target, test_size, prediction_length, eval_metric)
+            print(f"-------DF columns: {self.executor.df.columns}--")
+            self.automl_agent = create_automl_agent(self.executor.df, self.executor.llm, target, test_size, prediction_length, eval_metric)
+
+        automl_agent = self.automl_agent
 
         try:
             # Invoke the AutoML agent
@@ -386,6 +416,16 @@ class AutoMLNode(Node):
                 return {"subagents_report": report, "logs": logs}
 
             decision = json.loads(json_match.group(0))
+
+            # If the tool itself returned an error field, report it clearly and return the full tool result
+            if isinstance(decision, dict) and decision.get("error"):
+                error_msg = f"[AutoML Node] Tool reported error: {decision.get('error')}"
+                # include any logs provided by the tool
+                tool_logs = decision.get("logs") or []
+                if tool_logs:
+                    logs.extend(tool_logs)
+                logs.append(error_msg)
+                return {"subagents_report": error_msg, "automl_result": decision, "logs": logs}
 
             # Build a concise report of the most important keys, but preserve all prediction data
             model = decision.get("best_model") or decision.get("model")

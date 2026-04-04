@@ -227,7 +227,19 @@ def create_feature_engineering_agent(df: pd.DataFrame, llm) -> AgentExecutor:
             * **FORBIDDEN:** Do not use `df.plot()`.
             * Use `retrieve_context` rag tool for errors or general advices on techniques and parameters.
 
-        7. **PERSISTENCE (CRITICAL):**
+        7.  **STRICT TEMPORAL CAUSALITY (CRITICAL):**
+            * You MUST assume a time-series forecasting setting.
+            * You are STRICTLY FORBIDDEN from using any future information.
+            * Any feature at time t MUST depend ONLY on data from time t-1 or earlier.
+
+            * MANDATORY:
+                - All rolling, expanding, or smoothing operations MUST be followed by `.shift(1)`
+                - All lag-based features MUST use positive lags (e.g., `.shift(1)`, `.shift(7)`)
+            * FORBIDDEN:
+                - Using current or future target values (e.g., `.shift(-1)`, no shift, or centered windows)
+                - Any transformation that uses the full dataset (e.g., global mean, normalization using all data)
+
+        8. **PERSISTENCE (CRITICAL):**
             * ALL feature engineering MUST modify the original `df` in-place.
             * Be CAUTIOUS with the new columns you create. Only keep those that are justified and show promise based on your analysis.
             * You MUST NOT create a new DataFrame or overwrite `df`.

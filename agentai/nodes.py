@@ -3,6 +3,7 @@ import re
 from langchain.callbacks.base import BaseCallbackHandler
 from typing import Dict, Any
 import pandas as pd
+import numpy as np
 
 from langchain_core.messages import HumanMessage
 from agentai.modules.common import AgentState
@@ -54,6 +55,59 @@ class FeatureEngineeringNode(Node):
         self.executor = executor
         self.agent = create_feature_engineering_agent(self.executor.df, self.executor.llm)
 
+    def check_data_leak(self, features, target):
+        num_rows = len(self.executor.df)
+
+        if num_rows>500:
+            n = random.randint(0, num_rows-500)
+            sample =  self.executor.df.iloc[n:n+500].copy()
+        else:
+            sample = self.executor.df.copy()
+
+        didLeak = False
+        leaks = []
+
+        for feature in features:
+            
+            correlations = []
+            lags = []
+
+            for i in range(-3,4, 1):
+                valid = sample[[feature, target]].copy()
+                valid[target] = valid[target].shift(i)
+                valid.dropna(inplace=True)
+                corr = valid[feature].corr( valid[target] )
+                if not np.isnan(corr):
+                    correlations.append(corr)
+                    lags.append(i)
+
+            if not correlations:
+                continue
+
+            idx = np.argmax( np.abs(correlations) )
+            lag = lags[idx]
+            value = correlations[idx]
+
+            # pegar leak futuro
+            if lag < 0 and abs(value) > 0.3: 
+                didLeak = True
+                leaks.append(feature)
+                print("VAZAMENTO FUTURO\n")
+            
+            # pegar leak presente
+            else:
+                if 0 in lags:
+                    corr_0 = correlations[lags.index(0)]
+                    if abs(corr_0) > 0.9:  
+                        didLeak = True
+                        leaks.append(feature)
+                        print("VAZAMENTO PRESENTE\n")
+
+
+        return (didLeak, leaks)
+
+
+
     def execute(self, state: AgentState) -> dict:
         logs = state.get("logs", [])
         msg = state.get("msg", "")
@@ -66,9 +120,40 @@ class FeatureEngineeringNode(Node):
             return {"subagents_report": error_report, "logs": logs}
 
         try:
+            count = 0
+            max_attempts = 3
+            base_msg = msg
+
+            while count < max_attempts:
+                count+=1
+
+                original_cols = set(self.executor.df.columns)
+
+                response = self.agent.invoke({"input": msg}, config={"callbacks": [thought_collector]})
+                report = response.get("output", "") or str(response)
+                
+                new_features = list( set(self.executor.df.columns) - original_cols)
+
+                if not new_features:
+                    break
+
+                target = state.get("target")
+
+                didLeak, leaks = self.check_data_leak(new_features, target=target)
+
+
+                if didLeak:
+                    print(f"\n[LeakDetection] Vazamento detectado nas features: {leaks}\n")
+                    self.executor.df.drop(columns=leaks, inplace=True, errors="ignore")
+                    self.agent = create_feature_engineering_agent(self.executor.df, self.executor.llm)
+                    msg = f"{base_msg}\nAvoid creating features that use future information. Previous features {leaks} caused data leakage."
+                    continue
+                print(f"\n[LeakDetection] Não houve vazamento de dados\n")
+                break
             
-            response = self.agent.invoke({"input": msg}, config={"callbacks": [thought_collector]})
-            report = response.get("output", "") or str(response)
+
+            if count == max_attempts:
+                logs.append("[LeakDetection] Maximum number of attempts reached in Feature Engineering, some features were removed. Agent thoughts are shown below:")
 
             full_thought_process = thought_collector.thoughts
             
@@ -84,6 +169,7 @@ class FeatureEngineeringNode(Node):
             error_report = f"[FeatureEngineeringNode] Error: {e}"
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
+
 
 class PandasNode(Node):
     """Run a pandas-capable inspection agent against the executor.df"""
@@ -246,31 +332,6 @@ class RetrieverNode(Node):
             logs.append(error_report)
             return {"subagents_report": error_report, "logs": logs}
     
-# class PlotterNode(Node):
-#     def __init__(self, executor):
-#         super().__init__("plot")
-#         self.executor = executor
-#         self.agent = create_plotter_agent(self.executor.df, self.executor.images_path, self.executor.llm)
-
-#     def execute(self, state: AgentState) -> dict:
-#         msg = state.get("msg", "").lower()
-#         logs = state.get("logs", [])
-
-#         input_message = (
-#             f"Create plots to help analyze the dataset based on the following instruction: '{msg}'.\n"
-#             f"If the instruction is not clear, create simple plots like scatter, time series, heatmap and histogram.\n"
-#         )
-        
-#         report = f"\n[Plotter Node] "
-
-#         try:
-#             response = self.agent.invoke({"input": input_message})
-#             report += response.get("output", "") or str(response)
-#         except Exception as e:
-#             report += f"Time series agent failed to execute instruction. Error: {e}"
-        
-#         logs.append(report)
-#         return {"subagents_report": report, "logs": logs}
 
 class FeedbackNode(Node):
     def __init__(self, executor):
